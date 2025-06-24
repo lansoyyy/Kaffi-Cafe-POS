@@ -37,101 +37,136 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   final amount = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: bayanihanBlue,
         foregroundColor: Colors.white,
-        title: SizedBox(
-          height: 40,
-          width: 300,
+        elevation: 4,
+        title: Container(
+          width: 350,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white12,
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: TextField(
             decoration: InputDecoration(
-              suffixIcon: Icon(
-                Icons.search,
-                color: Colors.white,
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              hintText: 'Search items...',
+              hintStyle: const TextStyle(
+                color: Colors.white70,
+                fontFamily: 'Regular',
+                fontSize: 16,
               ),
               border: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.white, width: 2),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-              labelText: 'Search',
-              labelStyle: TextStyle(
-                fontFamily: 'Bold',
-                color: Colors.white,
-              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
+            style: const TextStyle(color: Colors.white),
           ),
         ),
         bottom: TabBar(
-          indicatorColor: Colors.white,
           controller: _tabController,
+          isScrollable: true,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          labelStyle: const TextStyle(
+            fontFamily: 'Medium',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontFamily: 'Regular',
+            fontSize: 16,
+          ),
           tabs: categories
               .map((cat) => Tab(
                     child: TextWidget(
                       text: cat,
-                      fontSize: 18,
+                      fontSize: 16,
                       color: Colors.white,
                     ),
                   ))
               .toList(),
-          isScrollable: true,
         ),
       ),
-      drawer: DrawerWidget(),
+      drawer: const DrawerWidget(),
       body: TabBarView(
         controller: _tabController,
         children: categories.map((category) {
           return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 450,
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3),
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.all(5.0),
-                      child: TouchableWidget(
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(5.0),
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8,
+                    ),
+                    itemCount: 6, // Sample item count
+                    itemBuilder: (context, index) {
+                      return TouchableWidget(
                         child: Card(
-                          elevation: 5,
-                          color: Colors.white,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.coffee,
-                                size: 65,
-                                color: bayanihanBlue,
-                              ),
-                              SizedBox(
-                                height: 10,
-                              ),
-                              TextWidget(
-                                text: 'Name of Item',
-                                fontSize: 16,
-                                fontFamily: 'Medium',
-                                color: Colors.black,
-                              ),
-                            ],
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.coffee,
+                                  size: 60,
+                                  color: bayanihanBlue,
+                                ),
+                                const SizedBox(height: 12),
+                                TextWidget(
+                                  text: 'Item Name',
+                                  fontSize: 16,
+                                  fontFamily: 'Medium',
+                                  color: Colors.grey[800],
+                                ),
+                                TextWidget(
+                                  text: 'P150.00',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[600],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
+              Container(
+                width: 360,
+                padding: const EdgeInsets.all(16.0),
                 child: Card(
                   elevation: 6,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Container(
-                    width: 325,
                     padding: const EdgeInsets.all(20.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -142,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(
-                            height: 160,
+                            height: 180,
                             child: ListView.builder(
                               itemCount: 2,
                               itemBuilder: (context, index) {
@@ -151,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen>
                                       const EdgeInsets.symmetric(vertical: 6.0),
                                   padding: const EdgeInsets.all(12.0),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: Colors.grey[50],
                                     borderRadius: BorderRadius.circular(10),
                                     border:
                                         Border.all(color: Colors.grey[200]!),
@@ -175,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
+                                      const SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -221,11 +256,12 @@ class _HomeScreenState extends State<HomeScreen>
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: TextField(
+                              controller: amount,
                               decoration: InputDecoration(
                                 filled: true,
                                 fillColor: Colors.white,
                                 prefixIcon: Icon(
-                                  Icons.payment,
+                                  Icons.attach_money,
                                   color: Colors.green[600],
                                 ),
                                 hintText: 'Enter Amount Paid',
@@ -238,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   borderSide: BorderSide.none,
                                 ),
                                 contentPadding:
-                                    EdgeInsets.symmetric(vertical: 16),
+                                    const EdgeInsets.symmetric(vertical: 16),
                               ),
                               keyboardType: TextInputType.number,
                             ),
@@ -320,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
-              )
+              ),
             ],
           );
         }).toList(),
