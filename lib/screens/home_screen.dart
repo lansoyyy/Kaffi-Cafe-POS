@@ -45,30 +45,44 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: bayanihanBlue,
         foregroundColor: Colors.white,
         elevation: 4,
-        title: Container(
-          width: 350,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white12,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search, color: Colors.white70),
-              hintText: 'Search items...',
-              hintStyle: const TextStyle(
-                color: Colors.white70,
-                fontFamily: 'Regular',
-                fontSize: 16,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            TextWidget(
+              text: 'Register',
+              fontSize: 18,
+              fontFamily: 'Bold',
+              color: Colors.white,
             ),
-            style: const TextStyle(color: Colors.white),
-          ),
+            SizedBox(
+              width: 20,
+            ),
+            Container(
+              width: 350,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                  hintText: 'Search items...',
+                  hintStyle: const TextStyle(
+                    color: Colors.white70,
+                    fontFamily: 'Regular',
+                    fontSize: 16,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -110,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                      crossAxisCount: 4,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
                       childAspectRatio: 0.8,

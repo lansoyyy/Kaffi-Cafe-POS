@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:kaffi_cafe_pos/screens/order_screen.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/widgets/divider_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 
 import '../screens/home_screen.dart';
@@ -51,6 +53,32 @@ class DrawerWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
+              DividerWidget(),
+              ListTile(
+                leading: const Icon(
+                  Icons.phone,
+                  color: Colors.white,
+                  size: 26,
+                ),
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const OrderScreen()),
+                  );
+                },
+                title: TextWidget(
+                  text: 'Orders',
+                  fontSize: 16,
+                  fontFamily: 'Medium',
+                  color: Colors.white,
+                ),
+                hoverColor: Colors.white10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              DividerWidget(),
               // ListTile(
               //   leading: const Icon(
               //     Icons.inventory_2_outlined,
