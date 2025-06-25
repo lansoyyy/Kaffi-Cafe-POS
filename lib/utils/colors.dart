@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 const Color sunshineYellow = Color(0xFFFFD400);
-const Color bayanihanBlue = Color(0xFF0033A0);
+const Color bayanihanBlue = Color(0xFF6689A7);
 const Color festiveRed = Color(0xFFD32F2F);
 const Color palmGreen = Color(0xFF388E3C);
 const Color cloudWhite = Color(0xFFF5F5F5);

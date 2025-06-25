@@ -105,6 +105,31 @@ class DrawerWidget extends StatelessWidget {
                 ),
               ),
               DividerWidget(),
+              ListTile(
+                leading: const Icon(
+                  Icons.grading_sharp,
+                  color: Colors.white,
+                  size: 26,
+                ),
+                onTap: () {
+                  // Navigator.pushReplacement(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //       builder: (context) => const InventoryScreen()),
+                  // );
+                },
+                title: TextWidget(
+                  text: 'Reports',
+                  fontSize: 16,
+                  fontFamily: 'Medium',
+                  color: Colors.white,
+                ),
+                hoverColor: Colors.white10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              DividerWidget(),
               // ListTile(
               //   leading: const Icon(
               //     Icons.inventory_2_outlined,
