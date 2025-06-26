@@ -38,6 +38,8 @@ dependencies:
   fluttertoast:
   get_storage:
   table_calendar:
+  image_picker: ^1.1.2
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:
