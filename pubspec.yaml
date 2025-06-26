@@ -37,6 +37,7 @@ dependencies:
   intl:
   fluttertoast:
   get_storage:
+  table_calendar:
 
 dev_dependencies:
   flutter_test:

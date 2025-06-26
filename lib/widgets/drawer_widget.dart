@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kaffi_cafe_pos/screens/inventory_screen.dart';
 import 'package:kaffi_cafe_pos/screens/order_screen.dart';
+import 'package:kaffi_cafe_pos/screens/transaction_screen.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/divider_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -120,6 +121,31 @@ class DrawerWidget extends StatelessWidget {
                 },
                 title: TextWidget(
                   text: 'Reports',
+                  fontSize: 16,
+                  fontFamily: 'Medium',
+                  color: Colors.white,
+                ),
+                hoverColor: Colors.white10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              DividerWidget(),
+              ListTile(
+                leading: const Icon(
+                  Icons.account_balance_wallet,
+                  color: Colors.white,
+                  size: 26,
+                ),
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const TransactionScreen()),
+                  );
+                },
+                title: TextWidget(
+                  text: 'Transactions',
                   fontSize: 16,
                   fontFamily: 'Medium',
                   color: Colors.white,
