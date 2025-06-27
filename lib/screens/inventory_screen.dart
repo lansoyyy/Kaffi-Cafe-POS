@@ -2,9 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
+import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 
-class InventoryScreen extends StatelessWidget {
+class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
+
+  @override
+  _InventoryScreenState createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends State<InventoryScreen> {
+  String _selectedCategory = 'All'; // Default category
+
+  // Sample product data with categories
+  final List<Map<String, dynamic>> _products = [
+    {'name': 'Espresso', 'stock': 50, 'price': 120.0, 'category': 'Coffee'},
+    {'name': 'Latte', 'stock': 30, 'price': 150.0, 'category': 'Coffee'},
+    {'name': 'Iced Tea', 'stock': 20, 'price': 100.0, 'category': 'Drinks'},
+    {'name': 'Orange Juice', 'stock': 15, 'price': 110.0, 'category': 'Drinks'},
+    {'name': 'Croissant', 'stock': 40, 'price': 80.0, 'category': 'Foods'},
+    {'name': 'Sandwich', 'stock': 25, 'price': 200.0, 'category': 'Foods'},
+  ];
+
+  // Filter products by category
+  List<Map<String, dynamic>> _filteredProducts() {
+    if (_selectedCategory == 'All') return _products;
+    return _products
+        .where((product) => product['category'] == _selectedCategory)
+        .toList();
+  }
 
   // Dialog for updating ingredient details
   void _showUpdateIngredientDialog(
@@ -16,6 +42,7 @@ class InventoryScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
         title: TextWidget(
           text: 'Update Ingredient',
           fontSize: 18,
@@ -32,6 +59,10 @@ class InventoryScreen extends StatelessWidget {
                 labelStyle: TextStyle(color: Colors.grey[600]),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: primaryBlue, width: 2),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -43,6 +74,10 @@ class InventoryScreen extends StatelessWidget {
                 labelStyle: TextStyle(color: Colors.grey[600]),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: primaryBlue, width: 2),
+                ),
               ),
             ),
           ],
@@ -60,10 +95,12 @@ class InventoryScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               // Implement update logic here
+              print(
+                  'Ingredient Updated: ${nameController.text}, ${quantityController.text} kg');
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: bayanihanBlue,
+              backgroundColor: primaryBlue,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
@@ -80,57 +117,101 @@ class InventoryScreen extends StatelessWidget {
   }
 
   // Dialog for updating menu product details
-  void _showUpdateProductDialog(
-      BuildContext context, String productName, int stock, double price) {
+  void _showUpdateProductDialog(BuildContext context, String productName,
+      int stock, double price, String category) {
     final nameController = TextEditingController(text: productName);
     final stockController = TextEditingController(text: stock.toString());
     final priceController = TextEditingController(text: price.toString());
+    String selectedCategory = category.isEmpty ? 'Coffee' : category;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
         title: TextWidget(
           text: 'Update Product',
           fontSize: 18,
           fontFamily: 'Bold',
           color: Colors.grey[800],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'Product Name',
-                labelStyle: TextStyle(color: Colors.grey[600]),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Product Name',
+                  labelStyle: TextStyle(color: Colors.grey[600]),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: stockController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Stock (units)',
-                labelStyle: TextStyle(color: Colors.grey[600]),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  labelStyle: TextStyle(color: Colors.grey[600]),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                  ),
+                ),
+                items: ['Coffee', 'Drinks', 'Foods'].map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: TextWidget(
+                      text: category,
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.black87,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  selectedCategory = value!;
+                },
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Price (P)',
-                labelStyle: TextStyle(color: Colors.grey[600]),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: stockController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Stock (units)',
+                  labelStyle: TextStyle(color: Colors.grey[600]),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Price (P)',
+                  labelStyle: TextStyle(color: Colors.grey[600]),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -144,11 +225,20 @@ class InventoryScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
+              if (nameController.text.isEmpty ||
+                  stockController.text.isEmpty ||
+                  priceController.text.isEmpty) {
+                return;
+              }
               // Implement update logic here
+              print('Product Updated: ${nameController.text}, '
+                  'Category: $selectedCategory, '
+                  'Stock: ${stockController.text}, '
+                  'Price: ${priceController.text}');
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: bayanihanBlue,
+              backgroundColor: primaryBlue,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
@@ -169,7 +259,7 @@ class InventoryScreen extends StatelessWidget {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: primaryBlue,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -230,31 +320,15 @@ class InventoryScreen extends StatelessWidget {
                         fontFamily: 'Bold',
                         color: Colors.grey[800],
                       ),
-                      ElevatedButton.icon(
+                      ButtonWidget(
+                        radius: 12,
+                        color: primaryBlue,
+                        textColor: Colors.white,
+                        label: 'Add Ingredient',
                         onPressed: () {
-                          _showUpdateIngredientDialog(
-                              context, '', 0.0); // Empty for new ingredient
+                          _showUpdateIngredientDialog(context, '', 0.0);
                         },
-                        icon: const Icon(
-                          Icons.add,
-                          size: 22,
-                          color: Colors.white,
-                        ),
-                        label: TextWidget(
-                          text: 'Add Ingredient',
-                          fontSize: 16,
-                          fontFamily: 'Medium',
-                          color: Colors.white,
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: bayanihanBlue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          elevation: 2,
-                        ),
+                        fontSize: 16,
                       ),
                     ],
                   ),
@@ -339,7 +413,7 @@ class InventoryScreen extends StatelessWidget {
                                         },
                                         icon: Icon(
                                           Icons.edit,
-                                          color: Colors.blue[600],
+                                          color: primaryBlue,
                                           size: 26,
                                         ),
                                         tooltip: 'Update Ingredient',
@@ -386,41 +460,38 @@ class InventoryScreen extends StatelessWidget {
                         fontFamily: 'Bold',
                         color: Colors.grey[800],
                       ),
-                      ElevatedButton.icon(
+                      ButtonWidget(
+                        radius: 12,
+                        color: primaryBlue,
+                        textColor: Colors.white,
+                        label: 'Add Product',
                         onPressed: () {
-                          _showUpdateProductDialog(
-                              context, '', 0, 0.0); // Empty for new product
+                          _showUpdateProductDialog(context, '', 0, 0.0, '');
                         },
-                        icon: const Icon(
-                          Icons.add,
-                          size: 22,
-                          color: Colors.white,
-                        ),
-                        label: TextWidget(
-                          text: 'Add Product',
-                          fontSize: 16,
-                          fontFamily: 'Medium',
-                          color: Colors.white,
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: bayanihanBlue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          elevation: 2,
-                        ),
+                        fontSize: 16,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildCategoryButton('All'),
+                        _buildCategoryButton('Coffee'),
+                        _buildCategoryButton('Drinks'),
+                        _buildCategoryButton('Foods'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: ListView.builder(
-                      itemCount: 3, // Sample product count
+                      itemCount: _filteredProducts().length,
                       itemBuilder: (context, index) {
-                        final isLowStock =
-                            index == 1; // Example condition for low stock
+                        final product = _filteredProducts()[index];
+                        final isLowStock = product['stock'] <
+                            20; // Example low stock threshold
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Card(
@@ -451,7 +522,7 @@ class InventoryScreen extends StatelessWidget {
                                       Row(
                                         children: [
                                           TextWidget(
-                                            text: 'Caramel Macchiato',
+                                            text: product['name'],
                                             fontSize: 18,
                                             fontFamily: 'Medium',
                                             color: Colors.grey[800],
@@ -479,13 +550,22 @@ class InventoryScreen extends StatelessWidget {
                                         ],
                                       ),
                                       TextWidget(
-                                        text: 'Stock: 50 units',
+                                        text:
+                                            'Category: ${product['category']}',
                                         fontSize: 14,
                                         fontFamily: 'Regular',
                                         color: Colors.grey[600],
                                       ),
                                       TextWidget(
-                                        text: 'Price: P150.00',
+                                        text:
+                                            'Stock: ${product['stock']} units',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[600],
+                                      ),
+                                      TextWidget(
+                                        text:
+                                            'Price: P${product['price'].toStringAsFixed(2)}',
                                         fontSize: 14,
                                         fontFamily: 'Regular',
                                         color: Colors.grey[600],
@@ -496,12 +576,17 @@ class InventoryScreen extends StatelessWidget {
                                     children: [
                                       IconButton(
                                         onPressed: () {
-                                          _showUpdateProductDialog(context,
-                                              'Caramel Macchiato', 50, 150.0);
+                                          _showUpdateProductDialog(
+                                            context,
+                                            product['name'],
+                                            product['stock'],
+                                            product['price'],
+                                            product['category'],
+                                          );
                                         },
                                         icon: Icon(
                                           Icons.edit,
-                                          color: Colors.blue[600],
+                                          color: primaryBlue,
                                           size: 26,
                                         ),
                                         tooltip: 'Update Product',
@@ -532,6 +617,26 @@ class InventoryScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryButton(String category) {
+    final isSelected = _selectedCategory == category;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ButtonWidget(
+        width: 150,
+        radius: 12,
+        color: isSelected ? primaryBlue : Colors.grey[200]!,
+        textColor: isSelected ? Colors.white : Colors.grey[800],
+        label: category,
+        onPressed: () {
+          setState(() {
+            _selectedCategory = category;
+          });
+        },
+        fontSize: 14,
       ),
     );
   }
