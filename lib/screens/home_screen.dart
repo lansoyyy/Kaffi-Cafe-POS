@@ -18,10 +18,19 @@ class _HomeScreenState extends State<HomeScreen>
   late TabController _tabController;
 
   final List<String> categories = [
-    'Hot Drinks',
-    'Cold Drinks',
-    'Pastries',
-    'Sandwiches',
+    'Coffee',
+    'Drinks',
+    'Foods',
+  ];
+
+  // Sample product data with categories
+  final List<Map<String, dynamic>> _products = [
+    {'name': 'Espresso', 'price': 120.0, 'category': 'Coffee'},
+    {'name': 'Latte', 'price': 150.0, 'category': 'Coffee'},
+    {'name': 'Iced Tea', 'price': 100.0, 'category': 'Drinks'},
+    {'name': 'Orange Juice', 'price': 110.0, 'category': 'Drinks'},
+    {'name': 'Croissant', 'price': 80.0, 'category': 'Foods'},
+    {'name': 'Sandwich', 'price': 200.0, 'category': 'Foods'},
   ];
 
   @override
@@ -38,11 +47,25 @@ class _HomeScreenState extends State<HomeScreen>
 
   final amount = TextEditingController();
 
+  // Get icon for category
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Coffee':
+        return Icons.local_cafe;
+      case 'Drinks':
+        return Icons.local_drink;
+      case 'Foods':
+        return Icons.fastfood;
+      default:
+        return Icons.fastfood;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: primaryBlue,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -54,9 +77,7 @@ class _HomeScreenState extends State<HomeScreen>
               fontFamily: 'Bold',
               color: Colors.white,
             ),
-            SizedBox(
-              width: 20,
-            ),
+            const SizedBox(width: 20),
             Container(
               width: 350,
               height: 48,
@@ -114,13 +135,16 @@ class _HomeScreenState extends State<HomeScreen>
       body: TabBarView(
         controller: _tabController,
         children: categories.map((category) {
+          final filteredProducts = _products
+              .where((product) => product['category'] == category)
+              .toList();
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 flex: 3,
                 child: Padding(
-                  padding: const EdgeInsets.all(5.0),
+                  padding: const EdgeInsets.all(12.0),
                   child: GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -129,8 +153,9 @@ class _HomeScreenState extends State<HomeScreen>
                       mainAxisSpacing: 12,
                       childAspectRatio: 0.8,
                     ),
-                    itemCount: 6, // Sample item count
+                    itemCount: filteredProducts.length,
                     itemBuilder: (context, index) {
+                      final product = filteredProducts[index];
                       return TouchableWidget(
                         child: Card(
                           elevation: 4,
@@ -145,20 +170,25 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.coffee,
-                                  size: 60,
-                                  color: bayanihanBlue,
+                                CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: primaryBlue.withOpacity(0.1),
+                                  child: Icon(
+                                    _getCategoryIcon(product['category']),
+                                    size: 40,
+                                    color: primaryBlue,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 TextWidget(
-                                  text: 'Item Name',
+                                  text: product['name'],
                                   fontSize: 16,
                                   fontFamily: 'Medium',
                                   color: Colors.grey[800],
                                 ),
                                 TextWidget(
-                                  text: 'P150.00',
+                                  text:
+                                      'P${product['price'].toStringAsFixed(2)}',
                                   fontSize: 14,
                                   fontFamily: 'Regular',
                                   color: Colors.grey[600],
@@ -215,13 +245,11 @@ class _HomeScreenState extends State<HomeScreen>
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),
-                                        child: const Text(
-                                          'x2',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blue,
-                                          ),
+                                        child: TextWidget(
+                                          text: 'x2',
+                                          fontSize: 16,
+                                          fontFamily: 'Bold',
+                                          color: primaryBlue,
                                         ),
                                       ),
                                       const SizedBox(width: 16),
@@ -230,20 +258,17 @@ class _HomeScreenState extends State<HomeScreen>
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              'Caramel Macchiato',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey[800],
-                                              ),
+                                            TextWidget(
+                                              text: 'Caramel Macchiato',
+                                              fontSize: 16,
+                                              fontFamily: 'Medium',
+                                              color: Colors.grey[800],
                                             ),
-                                            Text(
-                                              'P150.00',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey[600],
-                                              ),
+                                            TextWidget(
+                                              text: 'P150.00',
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[600],
                                             ),
                                           ],
                                         ),
@@ -269,28 +294,10 @@ class _HomeScreenState extends State<HomeScreen>
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: TextField(
+                            child: TextFieldWidget(
+                              label: 'Enter Amount Paid',
                               controller: amount,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                prefixIcon: Icon(
-                                  Icons.attach_money,
-                                  color: Colors.green[600],
-                                ),
-                                hintText: 'Enter Amount Paid',
-                                hintStyle: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide.none,
-                                ),
-                                contentPadding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              keyboardType: TextInputType.number,
+                              inputType: TextInputType.number,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -299,21 +306,17 @@ class _HomeScreenState extends State<HomeScreen>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Subtotal',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey[800],
-                                ),
+                              TextWidget(
+                                text: 'Subtotal',
+                                fontSize: 18,
+                                fontFamily: 'Bold',
+                                color: Colors.grey[800],
                               ),
-                              Text(
-                                'P300.00',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey[800],
-                                ),
+                              TextWidget(
+                                text: 'P300.00',
+                                fontSize: 18,
+                                fontFamily: 'Bold',
+                                color: Colors.grey[800],
                               ),
                             ],
                           ),
@@ -321,21 +324,17 @@ class _HomeScreenState extends State<HomeScreen>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Change',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[600],
-                                ),
+                              TextWidget(
+                                text: 'Change',
+                                fontSize: 16,
+                                fontFamily: 'Medium',
+                                color: Colors.grey[600],
                               ),
-                              Text(
-                                'P200.00',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green[600],
-                                ),
+                              TextWidget(
+                                text: 'P200.00',
+                                fontSize: 16,
+                                fontFamily: 'Medium',
+                                color: Colors.green[600],
                               ),
                             ],
                           ),
@@ -343,26 +342,15 @@ class _HomeScreenState extends State<HomeScreen>
                           Divider(color: Colors.grey[300], thickness: 1.5),
                           const SizedBox(height: 20),
                           Center(
-                            child: ElevatedButton(
+                            child: ButtonWidget(
+                              radius: 12,
+                              color: Colors.green[600]!,
+                              textColor: Colors.white,
+                              label: 'Process Payment',
                               onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[600],
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size(240, 56),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 3,
-                                shadowColor: Colors.green[200],
-                              ),
-                              child: const Text(
-                                'Process Payment',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
+                              fontSize: 18,
+                              width: 240,
+                              height: 56,
                             ),
                           ),
                         ],

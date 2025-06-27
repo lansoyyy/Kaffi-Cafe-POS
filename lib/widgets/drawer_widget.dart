@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kaffi_cafe_pos/screens/inventory_screen.dart';
 import 'package:kaffi_cafe_pos/screens/order_screen.dart';
 import 'package:kaffi_cafe_pos/screens/receipt_screen.dart';
+import 'package:kaffi_cafe_pos/screens/reports_screen.dart';
 import 'package:kaffi_cafe_pos/screens/settings_screen.dart';
 import 'package:kaffi_cafe_pos/screens/transaction_screen.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
@@ -36,7 +37,7 @@ class DrawerWidget extends StatelessWidget {
               const SizedBox(height: 10),
               ListTile(
                 leading: const Icon(
-                  Icons.point_of_sale,
+                  Icons.store_mall_directory_outlined,
                   color: Colors.white,
                   size: 26,
                 ),
@@ -47,7 +48,7 @@ class DrawerWidget extends StatelessWidget {
                   );
                 },
                 title: TextWidget(
-                  text: 'POS Register',
+                  text: 'Orders',
                   fontSize: 16,
                   fontFamily: 'Medium',
                   color: Colors.white,
@@ -60,7 +61,7 @@ class DrawerWidget extends StatelessWidget {
               DividerWidget(),
               ListTile(
                 leading: const Icon(
-                  Icons.phone,
+                  Icons.mobile_friendly_outlined,
                   color: Colors.white,
                   size: 26,
                 ),
@@ -72,7 +73,7 @@ class DrawerWidget extends StatelessWidget {
                   );
                 },
                 title: TextWidget(
-                  text: 'Orders',
+                  text: 'Online Orders',
                   fontSize: 16,
                   fontFamily: 'Medium',
                   color: Colors.white,
@@ -115,11 +116,11 @@ class DrawerWidget extends StatelessWidget {
                   size: 26,
                 ),
                 onTap: () {
-                  // Navigator.pushReplacement(
-                  //   context,
-                  //   MaterialPageRoute(
-                  //       builder: (context) => const InventoryScreen()),
-                  // );
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SalesReportScreen()),
+                  );
                 },
                 title: TextWidget(
                   text: 'Reports',

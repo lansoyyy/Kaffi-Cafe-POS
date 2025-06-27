@@ -254,6 +254,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // Get icon for category
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Coffee':
+        return Icons.local_cafe;
+      case 'Drinks':
+        return Icons.local_drink;
+      case 'Foods':
+        return Icons.fastfood;
+      default:
+        return Icons.fastfood;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -500,7 +514,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Container(
-                              padding: const EdgeInsets.all(20.0),
+                              padding: const EdgeInsets.all(16.0),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
@@ -515,60 +529,76 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  Row(
                                     children: [
-                                      Row(
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor:
+                                            primaryBlue.withOpacity(0.1),
+                                        child: Icon(
+                                          _getCategoryIcon(product['category']),
+                                          color: primaryBlue,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          TextWidget(
-                                            text: product['name'],
-                                            fontSize: 18,
-                                            fontFamily: 'Medium',
-                                            color: Colors.grey[800],
-                                          ),
-                                          if (isLowStock) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
+                                          Row(
+                                            children: [
+                                              TextWidget(
+                                                text: product['name'],
+                                                fontSize: 18,
+                                                fontFamily: 'Medium',
+                                                color: Colors.grey[800],
+                                              ),
+                                              if (isLowStock) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
                                                       horizontal: 8,
                                                       vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red[50],
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: TextWidget(
-                                                text: 'Low Stock',
-                                                fontSize: 12,
-                                                fontFamily: 'Regular',
-                                                color: Colors.red[600],
-                                              ),
-                                            ),
-                                          ],
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red[50],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            6),
+                                                  ),
+                                                  child: TextWidget(
+                                                    text: 'Low Stock',
+                                                    fontSize: 12,
+                                                    fontFamily: 'Regular',
+                                                    color: Colors.red[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          TextWidget(
+                                            text:
+                                                'Category: ${product['category']}',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[600],
+                                          ),
+                                          TextWidget(
+                                            text:
+                                                'Stock: ${product['stock']} units',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[600],
+                                          ),
+                                          TextWidget(
+                                            text:
+                                                'Price: P${product['price'].toStringAsFixed(2)}',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[600],
+                                          ),
                                         ],
-                                      ),
-                                      TextWidget(
-                                        text:
-                                            'Category: ${product['category']}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[600],
-                                      ),
-                                      TextWidget(
-                                        text:
-                                            'Stock: ${product['stock']} units',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[600],
-                                      ),
-                                      TextWidget(
-                                        text:
-                                            'Price: P${product['price'].toStringAsFixed(2)}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[600],
                                       ),
                                     ],
                                   ),
