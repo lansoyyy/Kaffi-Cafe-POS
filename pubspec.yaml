@@ -40,6 +40,10 @@ dependencies:
   table_calendar:
   image_picker: ^1.1.2
   flutter_colorpicker: ^1.1.0
+  firebase_core:
+  firebase_database:
+  cloud_firestore:
+  firebase_storage:
 
 dev_dependencies:
   flutter_test:
