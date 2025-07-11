@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -12,29 +13,23 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  String _selectedCategory = 'All'; // Default category
+  String _selectedCategory = 'All';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  // Sample product data with categories
-  final List<Map<String, dynamic>> _products = [
-    {'name': 'Espresso', 'stock': 50, 'price': 120.0, 'category': 'Coffee'},
-    {'name': 'Latte', 'stock': 30, 'price': 150.0, 'category': 'Coffee'},
-    {'name': 'Iced Tea', 'stock': 20, 'price': 100.0, 'category': 'Drinks'},
-    {'name': 'Orange Juice', 'stock': 15, 'price': 110.0, 'category': 'Drinks'},
-    {'name': 'Croissant', 'stock': 40, 'price': 80.0, 'category': 'Foods'},
-    {'name': 'Sandwich', 'stock': 25, 'price': 200.0, 'category': 'Foods'},
-  ];
-
-  // Filter products by category
-  List<Map<String, dynamic>> _filteredProducts() {
-    if (_selectedCategory == 'All') return _products;
-    return _products
-        .where((product) => product['category'] == _selectedCategory)
-        .toList();
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
+    });
   }
 
-  // Dialog for updating ingredient details
-  void _showUpdateIngredientDialog(
-      BuildContext context, String ingredientName, double quantity) {
+  void _showUpdateIngredientDialog(BuildContext context, String? docId,
+      String ingredientName, double quantity) {
     final nameController = TextEditingController(text: ingredientName);
     final quantityController = TextEditingController(text: quantity.toString());
 
@@ -44,7 +39,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: Colors.white,
         title: TextWidget(
-          text: 'Update Ingredient',
+          text: docId == null ? 'Add Ingredient' : 'Update Ingredient',
           fontSize: 18,
           fontFamily: 'Bold',
           color: Colors.grey[800],
@@ -93,11 +88,66 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              // Implement update logic here
-              print(
-                  'Ingredient Updated: ${nameController.text}, ${quantityController.text} kg');
-              Navigator.pop(context);
+            onPressed: () async {
+              if (nameController.text.isEmpty ||
+                  quantityController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Please fill in all fields',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+                return;
+              }
+              final quantity = double.tryParse(quantityController.text);
+              if (quantity == null || quantity < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Invalid quantity',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+                return;
+              }
+              try {
+                final data = {
+                  'name': nameController.text,
+                  'searchName': nameController.text.toLowerCase(),
+                  'quantity': quantity,
+                  'timestamp': FieldValue.serverTimestamp(),
+                };
+                if (docId == null) {
+                  await _firestore.collection('ingredients').add(data);
+                } else {
+                  await _firestore
+                      .collection('ingredients')
+                      .doc(docId)
+                      .update(data);
+                }
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Error: $e',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryBlue,
@@ -105,7 +155,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             child: TextWidget(
-              text: 'Update',
+              text: docId == null ? 'Add' : 'Update',
               fontSize: 14,
               fontFamily: 'Medium',
               color: Colors.white,
@@ -116,9 +166,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // Dialog for updating menu product details
-  void _showUpdateProductDialog(BuildContext context, String productName,
-      int stock, double price, String category) {
+  void _showUpdateProductDialog(BuildContext context, String? docId,
+      String productName, int stock, double price, String category) {
     final nameController = TextEditingController(text: productName);
     final stockController = TextEditingController(text: stock.toString());
     final priceController = TextEditingController(text: price.toString());
@@ -130,7 +179,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: Colors.white,
         title: TextWidget(
-          text: 'Update Product',
+          text: docId == null ? 'Add Product' : 'Update Product',
           fontSize: 18,
           fontFamily: 'Bold',
           color: Colors.grey[800],
@@ -224,18 +273,70 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameController.text.isEmpty ||
                   stockController.text.isEmpty ||
                   priceController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Please fill in all fields',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
                 return;
               }
-              // Implement update logic here
-              print('Product Updated: ${nameController.text}, '
-                  'Category: $selectedCategory, '
-                  'Stock: ${stockController.text}, '
-                  'Price: ${priceController.text}');
-              Navigator.pop(context);
+              final stock = int.tryParse(stockController.text);
+              final price = double.tryParse(priceController.text);
+              if (stock == null || stock < 0 || price == null || price < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Invalid stock or price',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+                return;
+              }
+              try {
+                final data = {
+                  'name': nameController.text,
+                  'searchName': nameController.text.toLowerCase(),
+                  'stock': stock,
+                  'price': price,
+                  'category': selectedCategory,
+                  'timestamp': FieldValue.serverTimestamp(),
+                };
+                if (docId == null) {
+                  await _firestore.collection('products').add(data);
+                } else {
+                  await _firestore
+                      .collection('products')
+                      .doc(docId)
+                      .update(data);
+                }
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Error: $e',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.white,
+                    ),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryBlue,
@@ -243,7 +344,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             child: TextWidget(
-              text: 'Update',
+              text: docId == null ? 'Add' : 'Update',
               fontSize: 14,
               fontFamily: 'Medium',
               color: Colors.white,
@@ -254,7 +355,64 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // Get icon for category
+  Future<void> _deleteProduct(String docId) async {
+    try {
+      await _firestore.collection('products').doc(docId).delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Product deleted successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: primaryBlue,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error deleting product: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteIngredient(String docId) async {
+    try {
+      await _firestore.collection('ingredients').doc(docId).delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Ingredient deleted successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: primaryBlue,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error deleting ingredient: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'Coffee':
@@ -294,6 +452,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: TextField(
+                controller: _searchController,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search, color: Colors.white70),
                   hintText: 'Search inventory...',
@@ -317,7 +476,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Raw Ingredients Section
           Expanded(
             flex: 1,
             child: Padding(
@@ -340,7 +498,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         textColor: Colors.white,
                         label: 'Add Ingredient',
                         onPressed: () {
-                          _showUpdateIngredientDialog(context, '', 0.0);
+                          _showUpdateIngredientDialog(context, null, '', 0.0);
                         },
                         fontSize: 16,
                       ),
@@ -348,200 +506,67 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: 20),
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: 3, // Sample ingredient count
-                      itemBuilder: (context, index) {
-                        final isLowStock =
-                            index == 0; // Example condition for low stock
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Card(
-                            elevation: 5,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: _searchQuery.isEmpty
+                          ? _firestore
+                              .collection('ingredients')
+                              .orderBy('timestamp', descending: true)
+                              .snapshots()
+                          : _firestore
+                              .collection('ingredients')
+                              .where('searchName',
+                                  isGreaterThanOrEqualTo: _searchQuery)
+                              .where('searchName',
+                                  isLessThanOrEqualTo: '$_searchQuery\uf8ff')
+                              .orderBy('searchName')
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: TextWidget(
+                              text: 'Error: ${snapshot.error}',
+                              fontSize: 16,
+                              fontFamily: 'Regular',
+                              color: Colors.red[600],
                             ),
-                            child: Container(
-                              padding: const EdgeInsets.all(20.0),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isLowStock
-                                      ? Colors.red[100]!
-                                      : Colors.transparent,
-                                  width: 1,
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        final ingredients = snapshot.data!.docs;
+                        return ListView.builder(
+                          itemCount: ingredients.length,
+                          itemBuilder: (context, index) {
+                            final ingredient = ingredients[index];
+                            final data =
+                                ingredient.data() as Map<String, dynamic>;
+                            final isLowStock = (data['quantity'] as num) < 2;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Card(
+                                elevation: 5,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          TextWidget(
-                                            text: 'Coffee Beans',
-                                            fontSize: 18,
-                                            fontFamily: 'Medium',
-                                            color: Colors.grey[800],
-                                          ),
-                                          if (isLowStock) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red[50],
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: TextWidget(
-                                                text: 'Low Stock',
-                                                fontSize: 12,
-                                                fontFamily: 'Regular',
-                                                color: Colors.red[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      TextWidget(
-                                        text: 'Quantity: 5 kg',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[600],
-                                      ),
-                                    ],
+                                child: Container(
+                                  padding: const EdgeInsets.all(20.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isLowStock
+                                          ? Colors.red[100]!
+                                          : Colors.transparent,
+                                      width: 1,
+                                    ),
                                   ),
-                                  Row(
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      IconButton(
-                                        onPressed: () {
-                                          _showUpdateIngredientDialog(
-                                              context, 'Coffee Beans', 5.0);
-                                        },
-                                        icon: Icon(
-                                          Icons.edit,
-                                          color: primaryBlue,
-                                          size: 26,
-                                        ),
-                                        tooltip: 'Update Ingredient',
-                                      ),
-                                      IconButton(
-                                        onPressed: () {
-                                          // Delete ingredient logic
-                                        },
-                                        icon: Icon(
-                                          Icons.delete,
-                                          color: Colors.red[400],
-                                          size: 26,
-                                        ),
-                                        tooltip: 'Delete Ingredient',
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Menu Products Section
-          Expanded(
-            flex: 1,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextWidget(
-                        text: 'Menu Products',
-                        fontSize: 20,
-                        fontFamily: 'Bold',
-                        color: Colors.grey[800],
-                      ),
-                      ButtonWidget(
-                        radius: 12,
-                        color: primaryBlue,
-                        textColor: Colors.white,
-                        label: 'Add Product',
-                        onPressed: () {
-                          _showUpdateProductDialog(context, '', 0, 0.0, '');
-                        },
-                        fontSize: 16,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildCategoryButton('All'),
-                        _buildCategoryButton('Coffee'),
-                        _buildCategoryButton('Drinks'),
-                        _buildCategoryButton('Foods'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _filteredProducts().length,
-                      itemBuilder: (context, index) {
-                        final product = _filteredProducts()[index];
-                        final isLowStock = product['stock'] <
-                            20; // Example low stock threshold
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Card(
-                            elevation: 5,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.all(16.0),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isLowStock
-                                      ? Colors.red[100]!
-                                      : Colors.transparent,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 20,
-                                        backgroundColor:
-                                            primaryBlue.withOpacity(0.1),
-                                        child: Icon(
-                                          _getCategoryIcon(product['category']),
-                                          color: primaryBlue,
-                                          size: 24,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
                                       Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
@@ -549,7 +574,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           Row(
                                             children: [
                                               TextWidget(
-                                                text: product['name'],
+                                                text: data['name'] ?? 'Unnamed',
                                                 fontSize: 18,
                                                 fontFamily: 'Medium',
                                                 color: Colors.grey[800],
@@ -579,65 +604,300 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           ),
                                           TextWidget(
                                             text:
-                                                'Category: ${product['category']}',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[600],
-                                          ),
-                                          TextWidget(
-                                            text:
-                                                'Stock: ${product['stock']} units',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[600],
-                                          ),
-                                          TextWidget(
-                                            text:
-                                                'Price: P${product['price'].toStringAsFixed(2)}',
+                                                'Quantity: ${data['quantity']} kg',
                                             fontSize: 14,
                                             fontFamily: 'Regular',
                                             color: Colors.grey[600],
                                           ),
                                         ],
                                       ),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            onPressed: () {
+                                              _showUpdateIngredientDialog(
+                                                context,
+                                                ingredient.id,
+                                                data['name'] ?? '',
+                                                (data['quantity'] as num)
+                                                    .toDouble(),
+                                              );
+                                            },
+                                            icon: Icon(
+                                              Icons.edit,
+                                              color: primaryBlue,
+                                              size: 26,
+                                            ),
+                                            tooltip: 'Update Ingredient',
+                                          ),
+                                          IconButton(
+                                            onPressed: () {
+                                              _deleteIngredient(ingredient.id);
+                                            },
+                                            icon: Icon(
+                                              Icons.delete,
+                                              color: Colors.red[400],
+                                              size: 26,
+                                            ),
+                                            tooltip: 'Delete Ingredient',
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        onPressed: () {
-                                          _showUpdateProductDialog(
-                                            context,
-                                            product['name'],
-                                            product['stock'],
-                                            product['price'],
-                                            product['category'],
-                                          );
-                                        },
-                                        icon: Icon(
-                                          Icons.edit,
-                                          color: primaryBlue,
-                                          size: 26,
-                                        ),
-                                        tooltip: 'Update Product',
-                                      ),
-                                      IconButton(
-                                        onPressed: () {
-                                          // Delete product logic
-                                        },
-                                        icon: Icon(
-                                          Icons.delete,
-                                          color: Colors.red[400],
-                                          size: 26,
-                                        ),
-                                        tooltip: 'Delete Product',
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                ),
                               ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextWidget(
+                        text: 'Menu Products',
+                        fontSize: 20,
+                        fontFamily: 'Bold',
+                        color: Colors.grey[800],
+                      ),
+                      ButtonWidget(
+                        radius: 12,
+                        color: primaryBlue,
+                        textColor: Colors.white,
+                        label: 'Add Product',
+                        onPressed: () {
+                          _showUpdateProductDialog(
+                              context, null, '', 0, 0.0, '');
+                        },
+                        fontSize: 16,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildCategoryButton('All'),
+                        _buildCategoryButton('Coffee'),
+                        _buildCategoryButton('Drinks'),
+                        _buildCategoryButton('Foods'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: _searchQuery.isEmpty
+                          ? (_selectedCategory == 'All'
+                              ? _firestore
+                                  .collection('products')
+                                  .orderBy('timestamp', descending: true)
+                                  .snapshots()
+                              : _firestore
+                                  .collection('products')
+                                  .where('category',
+                                      isEqualTo: _selectedCategory)
+                                  .orderBy('timestamp', descending: true)
+                                  .snapshots())
+                          : (_selectedCategory == 'All'
+                              ? _firestore
+                                  .collection('products')
+                                  .where('searchName',
+                                      isGreaterThanOrEqualTo: _searchQuery)
+                                  .where('searchName',
+                                      isLessThanOrEqualTo:
+                                          '$_searchQuery\uf8ff')
+                                  .orderBy('searchName')
+                                  .snapshots()
+                              : _firestore
+                                  .collection('products')
+                                  .where('category',
+                                      isEqualTo: _selectedCategory)
+                                  .where('searchName',
+                                      isGreaterThanOrEqualTo: _searchQuery)
+                                  .where('searchName',
+                                      isLessThanOrEqualTo:
+                                          '$_searchQuery\uf8ff')
+                                  .orderBy('searchName')
+                                  .snapshots()),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: TextWidget(
+                              text: 'Error: ${snapshot.error}',
+                              fontSize: 16,
+                              fontFamily: 'Regular',
+                              color: Colors.red[600],
                             ),
-                          ),
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        final products = snapshot.data!.docs;
+                        return ListView.builder(
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            final product = products[index];
+                            final data = product.data() as Map<String, dynamic>;
+                            final isLowStock = (data['stock'] as num) < 20;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Card(
+                                elevation: 5,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isLowStock
+                                          ? Colors.red[100]!
+                                          : Colors.transparent,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 20,
+                                            backgroundColor:
+                                                primaryBlue.withOpacity(0.1),
+                                            child: Icon(
+                                              _getCategoryIcon(
+                                                  data['category'] ?? 'Foods'),
+                                              color: primaryBlue,
+                                              size: 24,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  TextWidget(
+                                                    text: data['name'] ??
+                                                        'Unnamed',
+                                                    fontSize: 18,
+                                                    fontFamily: 'Medium',
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                  if (isLowStock) ...[
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red[50],
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(6),
+                                                      ),
+                                                      child: TextWidget(
+                                                        text: 'Low Stock',
+                                                        fontSize: 12,
+                                                        fontFamily: 'Regular',
+                                                        color: Colors.red[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              TextWidget(
+                                                text:
+                                                    'Category: ${data['category'] ?? 'N/A'}',
+                                                fontSize: 14,
+                                                fontFamily: 'Regular',
+                                                color: Colors.grey[600],
+                                              ),
+                                              TextWidget(
+                                                text:
+                                                    'Stock: ${data['stock'] ?? 0} units',
+                                                fontSize: 14,
+                                                fontFamily: 'Regular',
+                                                color: Colors.grey[600],
+                                              ),
+                                              TextWidget(
+                                                text:
+                                                    'Price: P${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                                fontSize: 14,
+                                                fontFamily: 'Regular',
+                                                color: Colors.grey[600],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            onPressed: () {
+                                              _showUpdateProductDialog(
+                                                context,
+                                                product.id,
+                                                data['name'] ?? '',
+                                                (data['stock'] as num?)
+                                                        ?.toInt() ??
+                                                    0,
+                                                (data['price'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0,
+                                                data['category'] ?? '',
+                                              );
+                                            },
+                                            icon: Icon(
+                                              Icons.edit,
+                                              color: primaryBlue,
+                                              size: 26,
+                                            ),
+                                            tooltip: 'Update Product',
+                                          ),
+                                          IconButton(
+                                            onPressed: () {
+                                              _deleteProduct(product.id);
+                                            },
+                                            icon: Icon(
+                                              Icons.delete,
+                                              color: Colors.red[400],
+                                              size: 26,
+                                            ),
+                                            tooltip: 'Delete Product',
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -669,5 +929,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
         fontSize: 14,
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }

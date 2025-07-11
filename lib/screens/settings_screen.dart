@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:kaffi_cafe_pos/utils/colors.dart';
-import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
-import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
+import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,22 +17,57 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   File? _logoImage;
+  String? _logoUrl;
   Color _selectedColor = bayanihanBlue;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Business details controllers
-  final TextEditingController _businessNameController =
-      TextEditingController(text: 'Kaffi Cafe');
-  final TextEditingController _descriptionController = TextEditingController(
-      text:
-          'A cozy cafe serving premium coffee and pastries in a welcoming atmosphere.');
-  final TextEditingController _locationController =
-      TextEditingController(text: 'Cagayan De Oro City');
-  final TextEditingController _contactController =
-      TextEditingController(text: '+639639520422');
-  final TextEditingController _openHoursController =
-      TextEditingController(text: 'Mon-Sun, 7AM-9PM');
+  final TextEditingController _businessNameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _contactController = TextEditingController();
+  final TextEditingController _openHoursController = TextEditingController();
 
-  // Image picker for logo
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  // Load settings from Firestore
+  Future<void> _loadSettings() async {
+    try {
+      final doc = await _firestore.collection('settings').doc('business').get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          _businessNameController.text = data['businessName'] ?? 'Kaffi Cafe';
+          _descriptionController.text = data['description'] ??
+              'A cozy cafe serving premium coffee and pastries in a welcoming atmosphere.';
+          _locationController.text = data['location'] ?? 'Cagayan De Oro City';
+          _contactController.text = data['contact'] ?? '+639639520422';
+          _openHoursController.text = data['openHours'] ?? 'Mon-Sun, 7AM-9PM';
+          _logoUrl = data['logoUrl'];
+          _selectedColor = Color(data['primaryColor'] ?? bayanihanBlue.value);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error loading settings: $e',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
+  // Pick logo image
   Future<void> _pickLogoImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -38,6 +75,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _logoImage = File(pickedFile.path);
       });
+    }
+  }
+
+  // Upload logo to Firebase Storage
+  Future<String?> _uploadLogoImage() async {
+    if (_logoImage == null) return _logoUrl;
+    try {
+      final ref = _storage.ref().child('logos/business_logo.png');
+      await ref.putFile(_logoImage!);
+      final url = await ref.getDownloadURL();
+      return url;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error uploading logo: $e',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+      return null;
     }
   }
 
@@ -96,7 +157,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              print('Selected color: $_selectedColor');
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -117,27 +177,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Save all settings
-  void _saveSettings() {
-    print('Saving Settings:');
-    print('Logo: ${_logoImage?.path ?? "No logo selected"}');
-    print('Color: $_selectedColor');
-    print('Business Name: ${_businessNameController.text}');
-    print('Description: ${_descriptionController.text}');
-    print('Location: ${_locationController.text}');
-    print('Contact: ${_contactController.text}');
-    print('Open Hours: ${_openHoursController.text}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TextWidget(
-          text: 'Settings saved successfully!',
-          fontSize: 14,
-          fontFamily: 'Medium',
-          color: Colors.white,
+  // Save all settings to Firestore
+  Future<void> _saveSettings() async {
+    if (_businessNameController.text.isEmpty ||
+        _descriptionController.text.isEmpty ||
+        _locationController.text.isEmpty ||
+        _contactController.text.isEmpty ||
+        _openHoursController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Please fill in all fields',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
         ),
-        backgroundColor: bayanihanBlue,
-      ),
-    );
+      );
+      return;
+    }
+    try {
+      final logoUrl = await _uploadLogoImage();
+      await _firestore.collection('settings').doc('business').set({
+        'businessName': _businessNameController.text,
+        'description': _descriptionController.text,
+        'location': _locationController.text,
+        'contact': _contactController.text,
+        'openHours': _openHoursController.text,
+        'logoUrl': logoUrl,
+        'primaryColor': _selectedColor.value,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Settings saved successfully!',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: bayanihanBlue,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error saving settings: $e',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
   }
 
   @override
@@ -167,21 +262,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-        ),
+        decoration: const BoxDecoration(color: Colors.white),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Column: Logo and Color Palette
               Expanded(
                 flex: 1,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Logo Section
                     TextWidget(
                       text: 'App Logo',
                       fontSize: 22,
@@ -222,34 +313,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   child: child,
                                 ),
                               ),
-                              child: _logoImage == null
-                                  ? Container(
-                                      key: const ValueKey('placeholder'),
-                                      width: 200,
-                                      height: 200,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(16),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                                bayanihanBlue.withOpacity(0.4),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: TextWidget(
-                                          text: 'Logo\nPlaceholder',
-                                          fontSize: 18,
-                                          fontFamily: 'Medium',
-                                          color: Colors.grey[600],
-                                          align: TextAlign.center,
-                                        ),
-                                      ),
-                                    )
-                                  : ClipRRect(
+                              child: _logoImage != null
+                                  ? ClipRRect(
                                       key: const ValueKey('logo'),
                                       borderRadius: BorderRadius.circular(16),
                                       child: Image.file(
@@ -258,7 +323,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         height: 200,
                                         fit: BoxFit.cover,
                                       ),
-                                    ),
+                                    )
+                                  : _logoUrl != null
+                                      ? ClipRRect(
+                                          key: const ValueKey('logoUrl'),
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: Image.network(
+                                            _logoUrl!,
+                                            width: 200,
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Container(
+                                              width: 200,
+                                              height: 200,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: bayanihanBlue
+                                                        .withOpacity(0.4),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: TextWidget(
+                                                  text: 'Logo\nPlaceholder',
+                                                  fontSize: 18,
+                                                  fontFamily: 'Medium',
+                                                  color: Colors.grey[600],
+                                                  align: TextAlign.center,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          key: const ValueKey('placeholder'),
+                                          width: 200,
+                                          height: 200,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: bayanihanBlue
+                                                    .withOpacity(0.4),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Center(
+                                            child: TextWidget(
+                                              text: 'Logo\nPlaceholder',
+                                              fontSize: 18,
+                                              fontFamily: 'Medium',
+                                              color: Colors.grey[600],
+                                              align: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
                             ),
                             const SizedBox(height: 20),
                             ElevatedButton(
@@ -284,7 +416,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // Color Palette Section
                     TextWidget(
                       text: 'Color Palette',
                       fontSize: 22,
@@ -368,7 +499,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(width: 32),
-              // Right Column: Business Details
               Expanded(
                 flex: 1,
                 child: Column(
@@ -404,7 +534,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Business Name
                             TextWidget(
                               text: 'Business Name',
                               fontSize: 18,
@@ -442,7 +571,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Description
                             TextWidget(
                               text: 'Description',
                               fontSize: 18,
@@ -481,7 +609,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Location
                             TextWidget(
                               text: 'Location',
                               fontSize: 18,
@@ -519,7 +646,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Contact Details
                             TextWidget(
                               text: 'Contact Details',
                               fontSize: 18,
@@ -557,7 +683,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Open Hours
                             TextWidget(
                               text: 'Open Hours',
                               fontSize: 18,
@@ -605,7 +730,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
-      // Floating Save Button
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _saveSettings,
         backgroundColor: bayanihanBlue,
