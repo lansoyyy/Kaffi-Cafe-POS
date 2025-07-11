@@ -85,76 +85,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              TextWidget(
-                                text: 'Cashiers',
-                                fontSize: 18,
-                                fontFamily: 'Bold',
-                                color: bayanihanBlue,
-                              ),
-                              const SizedBox(width: 20),
-                              SizedBox(
-                                width: 400,
-                                height: 50,
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16.0, vertical: 8.0),
-                                  child: Row(
-                                    children: List.generate(
-                                      ['John', 'Jane', 'Alex', 'Sarah', 'Mike']
-                                          .length,
-                                      (index) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(right: 12.0),
-                                        child: ChoiceChip(
-                                          showCheckmark: false,
-                                          label: TextWidget(
-                                            text: [
-                                              'John',
-                                              'Jane',
-                                              'Alex',
-                                              'Sarah',
-                                              'Mike'
-                                            ][index],
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: _selectedIndex == index
-                                                ? Colors.white
-                                                : bayanihanBlue,
-                                          ),
-                                          selected: _selectedIndex == index,
-                                          onSelected: (selected) {
-                                            setState(() {
-                                              _selectedIndex =
-                                                  selected ? index : 0;
-                                            });
-                                          },
-                                          selectedColor: bayanihanBlue,
-                                          backgroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            side: BorderSide(
-                                                color: bayanihanBlue
-                                                    .withOpacity(0.2)),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 5),
-                                          elevation: 2,
-                                          pressElevation: 4,
-                                          shadowColor:
-                                              bayanihanBlue.withOpacity(0.3),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          SizedBox(),
                           Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(5),
