@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
@@ -12,56 +14,13 @@ class ReservationScreen extends StatefulWidget {
 }
 
 class _ReservationScreenState extends State<ReservationScreen> {
-  // Sample available seats and time slots
-  final List<Map<String, dynamic>> _availableSeats = [
-    {
-      'seat': 'Table 1',
-      'capacity': 2,
-      'available': true,
-      'reservation': null,
-    },
-    {
-      'seat': 'Table 2',
-      'capacity': 4,
-      'available': true,
-      'reservation': null,
-    },
-    {
-      'seat': 'Table 3',
-      'capacity': 4,
-      'available': false,
-      'reservation': {
-        'name': 'John Doe',
-        'date': '9/7/2025',
-        'time': '12:00 PM',
-        'order': 'Latte, Croissant',
-      },
-    },
-    {
-      'seat': 'Table 4',
-      'capacity': 6,
-      'available': true,
-      'reservation': null,
-    },
-    {
-      'seat': 'Booth 1',
-      'capacity': 4,
-      'available': true,
-      'reservation': null,
-    },
-    {
-      'seat': 'Booth 2',
-      'capacity': 6,
-      'available': false,
-      'reservation': {
-        'name': 'Jane Smith',
-        'date': '9/7/2025',
-        'time': '2:00 PM',
-        'order': 'Espresso, Muffin',
-      },
-    },
-  ];
-
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  DateTime _selectedDate = DateTime.now();
+  String? _selectedTime;
+  String? _selectedSeat;
+  int _numberOfGuests = 1;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _orderController = TextEditingController();
   final List<String> _timeSlots = [
     '10:00 AM',
     '11:00 AM',
@@ -73,13 +32,19 @@ class _ReservationScreenState extends State<ReservationScreen> {
     '5:00 PM',
   ];
 
-  // State variables
-  DateTime _selectedDate = DateTime.now();
-  String? _selectedTime;
-  String? _selectedSeat;
-  int _numberOfGuests = 1;
+  @override
+  void initState() {
+    super.initState();
+    // Initialize default values if needed
+  }
 
-  // Show date picker
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _orderController.dispose();
+    super.dispose();
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -104,44 +69,43 @@ class _ReservationScreenState extends State<ReservationScreen> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _selectedTime = null; // Reset time when date changes
-        _selectedSeat = null; // Reset seat when date changes
+        _selectedTime = null;
+        _selectedSeat = null;
+        _nameController.clear();
+        _orderController.clear();
+        _numberOfGuests = 1;
       });
     }
   }
 
-  // Show reservation details dialog
   void _showReservationDetails(
       BuildContext context, Map<String, dynamic> seat) {
+    final reservation = seat['reservation'];
+    final screenWidth = MediaQuery.of(context).size.width;
+    final fontSize = screenWidth * 0.018;
+
     showDialog(
       context: context,
-      builder: (context) {
-        final reservation = seat['reservation'];
-
-        print(reservation);
-        final screenWidth = MediaQuery.of(context).size.width;
-        final fontSize = screenWidth * 0.018;
-
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          backgroundColor: plainWhite,
-          title: TextWidget(
-            text: seat['seat'] +
-                (seat['available'] ? ' (Available)' : ' (Occupied)'),
-            fontSize: fontSize + 4,
-            color: textBlack,
-            isBold: true,
-            fontFamily: 'Bold',
-          ),
-          content: reservation == null
-              ? TextWidget(
-                  text: 'No reservation details available.',
-                  fontSize: fontSize + 2,
-                  color: charcoalGray,
-                  fontFamily: 'Regular',
-                )
-              : Column(
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: plainWhite,
+        title: TextWidget(
+          text: seat['seat'] +
+              (seat['available'] ? ' (Available)' : ' (Occupied)'),
+          fontSize: fontSize + 4,
+          color: textBlack,
+          isBold: true,
+          fontFamily: 'Bold',
+        ),
+        content: reservation == null
+            ? TextWidget(
+                text: 'No reservation details available.',
+                fontSize: fontSize + 2,
+                color: charcoalGray,
+                fontFamily: 'Regular',
+              )
+            : SingleChildScrollView(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -167,17 +131,91 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextWidget(
+                      text: 'Guests: ${reservation['guests']}',
+                      fontSize: fontSize + 2,
+                      color: textBlack,
+                      fontFamily: 'Regular',
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
                       text: 'Order: ${reservation['order']}',
                       fontSize: fontSize + 2,
                       color: textBlack,
                       fontFamily: 'Regular',
                     ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Status: ${reservation['status']}',
+                      fontSize: fontSize + 2,
+                      color: reservation['status'] == 'Confirmed'
+                          ? bayanihanBlue
+                          : festiveRed,
+                      fontFamily: 'Regular',
+                    ),
                   ],
                 ),
-          actions: [
+              ),
+        actions: [
+          if (reservation != null)
             ButtonWidget(
-              label: 'Close',
-              onPressed: () => Navigator.of(context).pop(),
+              label:
+                  reservation['status'] == 'Confirmed' ? 'Cancel' : 'Confirm',
+              onPressed: () async {
+                try {
+                  final newStatus = reservation['status'] == 'Confirmed'
+                      ? 'Cancelled'
+                      : 'Confirmed';
+                  await _firestore
+                      .collection('reservations')
+                      .doc(seat['docId'])
+                      .update({
+                    'reservation.status': newStatus,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: TextWidget(
+                        text:
+                            'Reservation ${newStatus.toLowerCase()} successfully',
+                        fontSize: fontSize,
+                        color: plainWhite,
+                        fontFamily: 'Regular',
+                      ),
+                      backgroundColor: bayanihanBlue,
+                    ),
+                  );
+                } catch (e) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: TextWidget(
+                        text: 'Error updating reservation: $e',
+                        fontSize: fontSize,
+                        color: plainWhite,
+                        fontFamily: 'Regular',
+                      ),
+                      backgroundColor: festiveRed,
+                    ),
+                  );
+                }
+              },
+              color: reservation['status'] == 'Confirmed'
+                  ? festiveRed
+                  : bayanihanBlue,
+              textColor: plainWhite,
+              fontSize: fontSize + 1,
+              height: 45,
+              width: 100,
+              radius: 10,
+            ),
+          if (reservation != null)
+            ButtonWidget(
+              label: 'Edit',
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showEditReservationDialog(context, seat);
+              },
               color: bayanihanBlue,
               textColor: plainWhite,
               fontSize: fontSize + 1,
@@ -185,29 +223,464 @@ class _ReservationScreenState extends State<ReservationScreen> {
               width: 100,
               radius: 10,
             ),
-          ],
-        );
-      },
+          ButtonWidget(
+            label: 'Close',
+            onPressed: () => Navigator.of(context).pop(),
+            color: ashGray,
+            textColor: textBlack,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+        ],
+      ),
     );
   }
+
+  void _showCreateReservationDialog(BuildContext context) {
+    if (_selectedTime == null || _selectedSeat == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Please select a time and seat',
+            fontSize: 14,
+            color: plainWhite,
+            fontFamily: 'Regular',
+          ),
+          backgroundColor: festiveRed,
+        ),
+      );
+      return;
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final fontSize = screenWidth * 0.018;
+
+    _nameController.clear();
+    _orderController.clear();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: plainWhite,
+        title: TextWidget(
+          text: 'Create Reservation for $_selectedSeat',
+          fontSize: fontSize + 4,
+          color: textBlack,
+          isBold: true,
+          fontFamily: 'Bold',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Customer Name',
+                  labelStyle: TextStyle(
+                    fontSize: fontSize + 2,
+                    fontFamily: 'Regular',
+                    color: charcoalGray,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: fontSize + 2,
+                  fontFamily: 'Regular',
+                  color: textBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _orderController,
+                decoration: InputDecoration(
+                  labelText: 'Order Details',
+                  labelStyle: TextStyle(
+                    fontSize: fontSize + 2,
+                    fontFamily: 'Regular',
+                    color: charcoalGray,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: fontSize + 2,
+                  fontFamily: 'Regular',
+                  color: textBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextWidget(
+                text: 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Time: $_selectedTime',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Guests: $_numberOfGuests',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ButtonWidget(
+            label: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(),
+            color: ashGray,
+            textColor: textBlack,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+          ButtonWidget(
+            label: 'Confirm',
+            onPressed: () async {
+              if (_nameController.text.isEmpty ||
+                  _orderController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Please fill in all fields',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: festiveRed,
+                  ),
+                );
+                return;
+              }
+              try {
+                final selectedSeatData =
+                    allSeats.firstWhere((s) => s['seat'] == _selectedSeat);
+                await _firestore.collection('reservations').add({
+                  'seat': _selectedSeat,
+                  'capacity': selectedSeatData['capacity'],
+                  'available': false,
+                  'reservation': {
+                    'name': _nameController.text,
+                    'date': DateFormat('dd/MM/yyyy').format(_selectedDate),
+                    'time': _selectedTime,
+                    'guests': _numberOfGuests,
+                    'order': _orderController.text,
+                    'status': 'Confirmed',
+                    'source': 'POS', // Indicates reservation made via POS
+                  },
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                Navigator.of(context).pop();
+                setState(() {
+                  _selectedTime = null;
+                  _selectedSeat = null;
+                  _nameController.clear();
+                  _orderController.clear();
+                  _numberOfGuests = 1;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text:
+                          'Reservation confirmed for $_selectedSeat at $_selectedTime',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: bayanihanBlue,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Error creating reservation: $e',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: festiveRed,
+                  ),
+                );
+              }
+            },
+            color: bayanihanBlue,
+            textColor: plainWhite,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditReservationDialog(
+      BuildContext context, Map<String, dynamic> seat) {
+    final reservation = seat['reservation'];
+    final screenWidth = MediaQuery.of(context).size.width;
+    final fontSize = screenWidth * 0.018;
+
+    _nameController.text = reservation['name'];
+    _orderController.text = reservation['order'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: plainWhite,
+        title: TextWidget(
+          text: 'Edit Reservation for ${seat['seat']}',
+          fontSize: fontSize + 4,
+          color: textBlack,
+          isBold: true,
+          fontFamily: 'Bold',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Customer Name',
+                  labelStyle: TextStyle(
+                    fontSize: fontSize + 2,
+                    fontFamily: 'Regular',
+                    color: charcoalGray,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: fontSize + 2,
+                  fontFamily: 'Regular',
+                  color: textBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _orderController,
+                decoration: InputDecoration(
+                  labelText: 'Order Details',
+                  labelStyle: TextStyle(
+                    fontSize: fontSize + 2,
+                    fontFamily: 'Regular',
+                    color: charcoalGray,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: fontSize + 2,
+                  fontFamily: 'Regular',
+                  color: textBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextWidget(
+                text: 'Date: ${reservation['date']}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Time: ${reservation['time']}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Guests: $_numberOfGuests',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ButtonWidget(
+            label: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(),
+            color: ashGray,
+            textColor: textBlack,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+          ButtonWidget(
+            label: 'Save',
+            onPressed: () async {
+              if (_nameController.text.isEmpty ||
+                  _orderController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Please fill in all fields',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: festiveRed,
+                  ),
+                );
+                return;
+              }
+              try {
+                await _firestore
+                    .collection('reservations')
+                    .doc(seat['docId'])
+                    .update({
+                  'reservation.name': _nameController.text,
+                  'reservation.order': _orderController.text,
+                  'reservation.guests': _numberOfGuests,
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                Navigator.of(context).pop();
+                setState(() {
+                  _nameController.clear();
+                  _orderController.clear();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Reservation updated successfully',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: bayanihanBlue,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Error updating reservation: $e',
+                      fontSize: fontSize,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: festiveRed,
+                  ),
+                );
+              }
+            },
+            color: bayanihanBlue,
+            textColor: plainWhite,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Define the list of all possible seats
+  final List<Map<String, dynamic>> allSeats = [
+    {
+      'seat': 'Table 1',
+      'capacity': 2,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+    {
+      'seat': 'Table 2',
+      'capacity': 4,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+    {
+      'seat': 'Table 3',
+      'capacity': 4,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+    {
+      'seat': 'Table 4',
+      'capacity': 6,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+    {
+      'seat': 'Booth 1',
+      'capacity': 4,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+    {
+      'seat': 'Booth 2',
+      'capacity': 6,
+      'available': true,
+      'reservation': null,
+      'docId': null
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final fontSize = screenWidth * 0.02; // Larger font for tablet
+    final fontSize = screenWidth * 0.02;
     final padding = screenWidth * 0.02;
 
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
         backgroundColor: bayanihanBlue,
-        foregroundColor: Colors.white,
+        foregroundColor: plainWhite,
         elevation: 4,
         title: TextWidget(
           text: 'Reservations',
           fontSize: 24,
           fontFamily: 'Bold',
-          color: Colors.white,
+          color: plainWhite,
           isBold: true,
         ),
       ),
@@ -216,13 +689,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left Column: Date, Time, and Guests
             Expanded(
               flex: 2,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Date Selection
                   TextWidget(
                     text: 'Select Date',
                     fontSize: 24,
@@ -255,7 +726,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         children: [
                           TextWidget(
                             text:
-                                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                DateFormat('dd/MM/yyyy').format(_selectedDate),
                             fontSize: fontSize + 2,
                             color: textBlack,
                             isBold: true,
@@ -276,7 +747,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Time Selection
                   TextWidget(
                     text: 'Select Time',
                     fontSize: 24,
@@ -305,8 +775,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           if (selected) {
                             setState(() {
                               _selectedTime = time;
-                              _selectedSeat =
-                                  null; // Reset seat when time changes
+                              _selectedSeat = null;
                             });
                           }
                         },
@@ -327,7 +796,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-                  // Number of Guests
                   TextWidget(
                     text: 'Number of Guests',
                     fontSize: 24,
@@ -383,7 +851,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
               ),
             ),
             const SizedBox(width: 20),
-            // Right Column: Seat Selection and Confirmation
             Expanded(
               flex: 3,
               child: Column(
@@ -398,113 +865,142 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     letterSpacing: 1,
                   ),
                   const SizedBox(height: 12),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3, // More columns for tablet
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio:
-                          screenWidth * 0.25 / (screenWidth * 0.25),
-                    ),
-                    itemCount: _availableSeats.length,
-                    itemBuilder: (context, index) {
-                      final seat = _availableSeats[index];
-                      final isSelected = _selectedSeat == seat['seat'];
-                      final isAvailable = seat['available'];
-                      return Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('reservations')
+                        .where('date',
+                            isEqualTo:
+                                DateFormat('dd/MM/yyyy').format(_selectedDate))
+                        .where('time', isEqualTo: _selectedTime ?? '')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: TextWidget(
+                            text: 'Error: ${snapshot.error}',
+                            fontSize: fontSize,
+                            color: festiveRed,
+                            fontFamily: 'Regular',
+                          ),
+                        );
+                      }
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final reservedSeats = snapshot.data!.docs
+                          .map((doc) => {
+                                ...doc.data() as Map<String, dynamic>,
+                                'docId': doc.id
+                              })
+                          .toList();
+                      final seats = List<Map<String, dynamic>>.from(allSeats);
+                      for (var seat in seats) {
+                        final reserved = reservedSeats.firstWhere(
+                          (r) => r['seat'] == seat['seat'],
+                          orElse: () => {},
+                        );
+                        if (reserved.isNotEmpty) {
+                          seat['available'] = false;
+                          seat['reservation'] = reserved['reservation'];
+                          seat['docId'] = reserved['docId'];
+                        }
+                      }
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio:
+                              screenWidth * 0.25 / (screenWidth * 0.25),
                         ),
-                        child: InkWell(
-                          onTap: () {
-                            print(seat);
-                            // Show reservation details dialog
-                            _showReservationDetails(context, seat);
-                            // Existing selection logic
-                            if (isAvailable && _selectedTime != null) {
-                              setState(() {
-                                _selectedSeat = seat['seat'];
-                              });
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(15),
-                          child: Container(
-                            padding: EdgeInsets.all(padding),
-                            decoration: BoxDecoration(
+                        itemCount: seats.length,
+                        itemBuilder: (context, index) {
+                          final seat = seats[index];
+                          final isSelected = _selectedSeat == seat['seat'];
+                          final isAvailable = seat['available'] &&
+                              _numberOfGuests <= seat['capacity'];
+                          return Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
-                              color: isAvailable
-                                  ? plainWhite
-                                  : ashGray.withOpacity(0.3),
-                              border: Border.all(
-                                color: isSelected
-                                    ? bayanihanBlue
-                                    : isAvailable
-                                        ? palmGreen
-                                        : festiveRed,
-                                width: 2,
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                _showReservationDetails(context, seat);
+                                if (isAvailable && _selectedTime != null) {
+                                  setState(() {
+                                    _selectedSeat = seat['seat'];
+                                  });
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(15),
+                              child: Container(
+                                padding: EdgeInsets.all(padding),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(15),
+                                  color: isAvailable
+                                      ? plainWhite
+                                      : ashGray.withOpacity(0.3),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? bayanihanBlue
+                                        : isAvailable
+                                            ? palmGreen
+                                            : festiveRed,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextWidget(
+                                      text: seat['seat'],
+                                      fontSize: fontSize + 2,
+                                      color: isAvailable
+                                          ? textBlack
+                                          : charcoalGray,
+                                      isBold: true,
+                                      fontFamily: 'Bold',
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextWidget(
+                                      text:
+                                          'Capacity: ${seat['capacity']} guests',
+                                      fontSize: fontSize,
+                                      color: isAvailable
+                                          ? charcoalGray
+                                          : charcoalGray.withOpacity(0.6),
+                                      fontFamily: 'Regular',
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextWidget(
+                                      text: isAvailable
+                                          ? 'Available'
+                                          : 'Occupied',
+                                      fontSize: fontSize,
+                                      color: isAvailable
+                                          ? bayanihanBlue
+                                          : charcoalGray,
+                                      isBold: true,
+                                      fontFamily: 'Bold',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextWidget(
-                                  text: seat['seat'],
-                                  fontSize: fontSize + 2,
-                                  color: isAvailable ? textBlack : charcoalGray,
-                                  isBold: true,
-                                  fontFamily: 'Bold',
-                                ),
-                                const SizedBox(height: 8),
-                                TextWidget(
-                                  text: 'Capacity: ${seat['capacity']} guests',
-                                  fontSize: fontSize,
-                                  color: isAvailable
-                                      ? charcoalGray
-                                      : charcoalGray.withOpacity(0.6),
-                                  fontFamily: 'Regular',
-                                ),
-                                const SizedBox(height: 8),
-                                TextWidget(
-                                  text: isAvailable ? 'Available' : 'Occupied',
-                                  fontSize: fontSize,
-                                  color: isAvailable
-                                      ? bayanihanBlue
-                                      : charcoalGray,
-                                  isBold: true,
-                                  fontFamily: 'Bold',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   ),
                   const SizedBox(height: 20),
-                  // Confirm Reservation Button
                   Center(
                     child: ButtonWidget(
-                      label: 'Confirm Reservation',
+                      label: 'Create Reservation',
                       onPressed: _selectedTime != null && _selectedSeat != null
-                          ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: TextWidget(
-                                    text:
-                                        'Reservation confirmed for $_selectedSeat at $_selectedTime on ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                                    fontSize: fontSize,
-                                    color: plainWhite,
-                                    fontFamily: 'Regular',
-                                  ),
-                                  backgroundColor: bayanihanBlue,
-                                  duration: const Duration(seconds: 3),
-                                ),
-                              );
-                              Navigator.pop(context);
-                            }
+                          ? () => _showCreateReservationDialog(context)
                           : () {},
                       color: _selectedTime != null && _selectedSeat != null
                           ? bayanihanBlue
@@ -518,7 +1014,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
