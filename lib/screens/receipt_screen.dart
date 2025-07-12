@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class ReceiptScreen extends StatefulWidget {
   const ReceiptScreen({super.key});
@@ -16,82 +20,29 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   DateTimeRange? _selectedDateRange;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  final List<Map<String, dynamic>> _receipts = [
-    {
-      'id': 'REC001',
-      'date': DateTime(2025, 6, 27, 8, 0),
-      'total': 250.50,
-      'customer': 'John Doe',
-      'paymentMethod': 'Cash',
-      'items': [
-        {'name': 'Espresso', 'quantity': 2, 'price': 120.0},
-        {'name': 'Croissant', 'quantity': 1, 'price': 80.0},
-      ],
-    },
-    {
-      'id': 'REC002',
-      'date': DateTime(2025, 6, 26, 14, 30),
-      'total': 350.75,
-      'customer': 'Jane Smith',
-      'paymentMethod': 'Card',
-      'items': [
-        {'name': 'Latte', 'quantity': 1, 'price': 150.0},
-        {'name': 'Sandwich', 'quantity': 1, 'price': 200.0},
-      ],
-    },
-    {
-      'id': 'REC003',
-      'date': DateTime(2025, 6, 25, 10, 15),
-      'total': 100.0,
-      'customer': 'Alex Brown',
-      'paymentMethod': 'Mobile Payment',
-      'items': [
-        {'name': 'Iced Tea', 'quantity': 1, 'price': 100.0},
-      ],
-    },
-    {
-      'id': 'REC004',
-      'date': DateTime(2025, 6, 24, 12, 45),
-      'total': 180.25,
-      'customer': 'Emily Davis',
-      'paymentMethod': 'Cash',
-      'items': [
-        {'name': 'Cappuccino', 'quantity': 1, 'price': 130.0},
-        {'name': 'Muffin', 'quantity': 1, 'price': 50.0},
-      ],
-    },
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Map<String, dynamic>> _filteredReceipts() {
-    List<Map<String, dynamic>> filtered = _receipts;
-    if (_selectedDateRange != null) {
-      filtered = filtered.where((receipt) {
-        final receiptDate = receipt['date'] as DateTime;
-        return receiptDate.isAfter(
-                _selectedDateRange!.start.subtract(Duration(days: 1))) &&
-            receiptDate
-                .isBefore(_selectedDateRange!.end.add(Duration(days: 1)));
-      }).toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where((receipt) =>
-              receipt['id']
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()) ||
-              receipt['customer']
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()))
-          .toList();
-    }
-    return filtered;
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2026),
+      lastDate: DateTime.now(),
       initialDateRange: _selectedDateRange,
       builder: (context, child) {
         return Theme(
@@ -120,7 +71,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: Colors.white,
         title: TextWidget(
-          text: 'Receipt Details - ${receipt['id']}',
+          text: 'Receipt Details - ${receipt['orderId']}',
           fontSize: 18,
           fontFamily: 'Bold',
           color: primaryBlue,
@@ -133,19 +84,20 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             children: [
               TextWidget(
                 text:
-                    'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(receipt['date'])}',
+                    'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(receipt['timestamp'].toDate())}',
                 fontSize: 14,
                 fontFamily: 'Regular',
                 color: Colors.grey[800],
               ),
               TextWidget(
-                text: 'Customer: ${receipt['customer']}',
+                text: 'Customer: ${receipt['buyer']}',
                 fontSize: 14,
                 fontFamily: 'Regular',
                 color: Colors.grey[800],
               ),
               TextWidget(
-                text: 'Payment Method: ${receipt['paymentMethod']}',
+                text:
+                    'Payment Method: ${receipt['status'] == 'Accepted' ? 'Cash' : 'Unknown'}',
                 fontSize: 14,
                 fontFamily: 'Regular',
                 color: Colors.grey[800],
@@ -190,6 +142,64 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     );
   }
 
+  Future<void> _printReceipt(Map<String, dynamic> receipt) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Kaffi Cafe',
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Receipt #${receipt['orderId']}',
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                  'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(receipt['timestamp'].toDate())}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Customer: ${receipt['buyer']}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 10),
+              pw.Text('Items:',
+                  style: pw.TextStyle(
+                      fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              ...receipt['items'].map<pw.Widget>((item) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Text(
+                      '${item['name']} x${item['quantity']} - P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                  )),
+              pw.SizedBox(height: 10),
+              pw.Text('Total: P${receipt['total'].toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                      fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            ],
+          );
+        },
+      ),
+    );
+
+    try {
+      await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdf.save());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error printing receipt: $e',
+            fontSize: 14,
+            fontFamily: 'Medium',
+            color: Colors.white,
+          ),
+          backgroundColor: Colors.red[600],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -214,7 +224,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search by ID or Customer',
-                  hintStyle: TextStyle(
+                  hintStyle: const TextStyle(
                     color: Colors.white70,
                     fontFamily: 'Regular',
                     fontSize: 16,
@@ -229,11 +239,6 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
               ),
             ),
           ],
@@ -244,7 +249,6 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Filters and Summary
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(
@@ -291,30 +295,66 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        TextWidget(
-                          text: 'Total Receipts: ${_filteredReceipts().length}',
-                          fontSize: 14,
-                          fontFamily: 'Medium',
-                          color: Colors.grey[800],
-                        ),
-                        TextWidget(
-                          text:
-                              'Total Amount: P${_filteredReceipts().fold(0.0, (sum, receipt) => sum + receipt['total']).toStringAsFixed(2)}',
-                          fontSize: 14,
-                          fontFamily: 'Medium',
-                          color: Colors.grey[800],
-                        ),
-                      ],
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _selectedDateRange == null
+                          ? _firestore
+                              .collection('orders')
+                              .orderBy('timestamp', descending: true)
+                              .snapshots()
+                          : _firestore
+                              .collection('orders')
+                              .where('timestamp',
+                                  isGreaterThanOrEqualTo: Timestamp.fromDate(
+                                      _selectedDateRange!.start))
+                              .where('timestamp',
+                                  isLessThanOrEqualTo: Timestamp.fromDate(
+                                      _selectedDateRange!.end))
+                              .orderBy('timestamp', descending: true)
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const SizedBox();
+                        }
+                        final receipts = snapshot.data!.docs
+                            .map((doc) => {
+                                  ...doc.data() as Map<String, dynamic>,
+                                  'docId': doc.id
+                                })
+                            .where((receipt) =>
+                                receipt['orderId']
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(_searchQuery.toLowerCase()) ||
+                                receipt['buyer']
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(_searchQuery.toLowerCase()))
+                            .toList();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            TextWidget(
+                              text: 'Total Receipts: ${receipts.length}',
+                              fontSize: 14,
+                              fontFamily: 'Medium',
+                              color: Colors.grey[800],
+                            ),
+                            TextWidget(
+                              text:
+                                  'Total Amount: P${receipts.fold(0.0, (sum, receipt) => sum + (receipt['total'] as num)).toStringAsFixed(2)}',
+                              fontSize: 14,
+                              fontFamily: 'Medium',
+                              color: Colors.grey[800],
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            // Receipts Table
             Expanded(
               child: Card(
                 elevation: 4,
@@ -322,135 +362,182 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     borderRadius: BorderRadius.circular(12)),
                 color: Colors.white,
                 child: SingleChildScrollView(
-                  child: DataTable(
-                    columnSpacing: 16,
-                    dataRowHeight: 60,
-                    headingRowColor:
-                        WidgetStatePropertyAll(primaryBlue.withOpacity(0.1)),
-                    columns: [
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Receipt ID',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Date',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Customer',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Payment',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Total (P)',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                      DataColumn(
-                        label: TextWidget(
-                          text: 'Actions',
-                          fontSize: 16,
-                          fontFamily: 'Bold',
-                          color: primaryBlue,
-                        ),
-                      ),
-                    ],
-                    rows: _filteredReceipts().map((receipt) {
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            TextWidget(
-                              text: receipt['id'],
-                              fontSize: 14,
-                              fontFamily: 'Regular',
-                              color: Colors.grey[800],
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _selectedDateRange == null
+                        ? _firestore
+                            .collection('orders')
+                            .orderBy('timestamp', descending: true)
+                            .snapshots()
+                        : _firestore
+                            .collection('orders')
+                            .where('timestamp',
+                                isGreaterThanOrEqualTo: Timestamp.fromDate(
+                                    _selectedDateRange!.start))
+                            .where('timestamp',
+                                isLessThanOrEqualTo:
+                                    Timestamp.fromDate(_selectedDateRange!.end))
+                            .orderBy('timestamp', descending: true)
+                            .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: TextWidget(
+                            text: 'Error: ${snapshot.error}',
+                            fontSize: 16,
+                            fontFamily: 'Regular',
+                            color: Colors.red[600],
+                          ),
+                        );
+                      }
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final receipts = snapshot.data!.docs
+                          .map((doc) => {
+                                ...doc.data() as Map<String, dynamic>,
+                                'docId': doc.id
+                              })
+                          .where((receipt) =>
+                              receipt['orderId']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(_searchQuery.toLowerCase()) ||
+                              receipt['buyer']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(_searchQuery.toLowerCase()))
+                          .toList();
+                      return DataTable(
+                        columnSpacing: 16,
+                        dataRowHeight: 60,
+                        headingRowColor: WidgetStatePropertyAll(
+                            primaryBlue.withOpacity(0.1)),
+                        columns: [
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Receipt ID',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
-                          DataCell(
-                            TextWidget(
-                              text: DateFormat('MMM dd, yyyy HH:mm')
-                                  .format(receipt['date']),
-                              fontSize: 14,
-                              fontFamily: 'Regular',
-                              color: Colors.grey[800],
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Date',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
-                          DataCell(
-                            TextWidget(
-                              text: receipt['customer'],
-                              fontSize: 14,
-                              fontFamily: 'Regular',
-                              color: Colors.grey[800],
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Customer',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
-                          DataCell(
-                            TextWidget(
-                              text: receipt['paymentMethod'],
-                              fontSize: 14,
-                              fontFamily: 'Regular',
-                              color: Colors.grey[800],
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Payment',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
-                          DataCell(
-                            TextWidget(
-                              text: receipt['total'].toStringAsFixed(2),
-                              fontSize: 14,
-                              fontFamily: 'Regular',
-                              color: Colors.grey[800],
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Total (P)',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ButtonWidget(
-                                  radius: 8,
-                                  color: primaryBlue,
-                                  textColor: Colors.white,
-                                  label: 'Details',
-                                  onPressed: () =>
-                                      _showReceiptDetails(context, receipt),
-                                  fontSize: 12,
-                                ),
-                                const SizedBox(width: 8),
-                                ButtonWidget(
-                                  radius: 8,
-                                  color: Colors.grey[200]!,
-                                  textColor: primaryBlue,
-                                  label: 'Print',
-                                  onPressed: () {
-                                    // Placeholder for print functionality
-                                  },
-                                  fontSize: 12,
-                                ),
-                              ],
+                          DataColumn(
+                            label: TextWidget(
+                              text: 'Actions',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: primaryBlue,
                             ),
                           ),
                         ],
+                        rows: receipts.map((receipt) {
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                TextWidget(
+                                  text: receipt['orderId'],
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              DataCell(
+                                TextWidget(
+                                  text: DateFormat('MMM dd, yyyy HH:mm')
+                                      .format(receipt['timestamp'].toDate()),
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              DataCell(
+                                TextWidget(
+                                  text: receipt['buyer'],
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              DataCell(
+                                TextWidget(
+                                  text: receipt['status'] == 'Accepted'
+                                      ? 'Cash'
+                                      : 'Unknown',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              DataCell(
+                                TextWidget(
+                                  text: receipt['total'].toStringAsFixed(2),
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              DataCell(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ButtonWidget(
+                                      radius: 8,
+                                      color: primaryBlue,
+                                      textColor: Colors.white,
+                                      label: 'Details',
+                                      onPressed: () =>
+                                          _showReceiptDetails(context, receipt),
+                                      fontSize: 12,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ButtonWidget(
+                                      radius: 8,
+                                      color: Colors.grey[200]!,
+                                      textColor: primaryBlue,
+                                      label: 'Print',
+                                      onPressed: () => _printReceipt(receipt),
+                                      fontSize: 12,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+                    },
                   ),
                 ),
               ),

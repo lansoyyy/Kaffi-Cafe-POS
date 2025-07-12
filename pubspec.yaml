@@ -44,6 +44,7 @@ dependencies:
   firebase_database:
   cloud_firestore:
   firebase_storage:
+  printing:
 
 dev_dependencies:
   flutter_test:
