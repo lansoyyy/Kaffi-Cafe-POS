@@ -1,9 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:csv/csv.dart';
+import 'package:universal_html/html.dart' as html;
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -15,110 +23,84 @@ class SalesReportScreen extends StatefulWidget {
 class _SalesReportScreenState extends State<SalesReportScreen> {
   String _selectedPeriod = 'Daily';
   DateTimeRange? _selectedDateRange;
-  final List<Map<String, dynamic>> _receipts = [
-    {
-      'id': 'REC001',
-      'date': DateTime(2025, 6, 27, 8, 0),
-      'total': 250.50,
-      'customer': 'John Doe',
-      'paymentMethod': 'Cash',
-      'items': [
-        {'name': 'Espresso', 'quantity': 2, 'price': 120.0},
-        {'name': 'Croissant', 'quantity': 1, 'price': 80.0},
-      ],
-    },
-    {
-      'id': 'REC002',
-      'date': DateTime(2025, 6, 26, 14, 30),
-      'total': 350.75,
-      'customer': 'Jane Smith',
-      'paymentMethod': 'Card',
-      'items': [
-        {'name': 'Latte', 'quantity': 1, 'price': 150.0},
-        {'name': 'Sandwich', 'quantity': 1, 'price': 200.0},
-      ],
-    },
-    {
-      'id': 'REC003',
-      'date': DateTime(2025, 6, 25, 10, 15),
-      'total': 100.0,
-      'customer': 'Alex Brown',
-      'paymentMethod': 'Mobile Payment',
-      'items': [
-        {'name': 'Iced Tea', 'quantity': 1, 'price': 100.0},
-      ],
-    },
-    {
-      'id': 'REC004',
-      'date': DateTime(2025, 6, 24, 12, 45),
-      'total': 180.25,
-      'customer': 'Emily Davis',
-      'paymentMethod': 'Cash',
-      'items': [
-        {'name': 'Cappuccino', 'quantity': 1, 'price': 130.0},
-        {'name': 'Muffin', 'quantity': 1, 'price': 50.0},
-      ],
-    },
-    {
-      'id': 'REC005',
-      'date': DateTime(2025, 6, 20, 9, 30),
-      'total': 200.0,
-      'customer': 'Michael Lee',
-      'paymentMethod': 'Card',
-      'items': [
-        {'name': 'Latte', 'quantity': 1, 'price': 150.0},
-        {'name': 'Muffin', 'quantity': 1, 'price': 50.0},
-      ],
-    },
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Map<String, dynamic>> _filteredReceipts() {
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Stream<QuerySnapshot> _getReceiptsStream() {
     final now = DateTime.now();
     if (_selectedDateRange != null) {
-      return _receipts.where((receipt) {
-        final receiptDate = receipt['date'] as DateTime;
-        return receiptDate.isAfter(
-                _selectedDateRange!.start.subtract(Duration(days: 1))) &&
-            receiptDate
-                .isBefore(_selectedDateRange!.end.add(Duration(days: 1)));
-      }).toList();
+      return _firestore
+          .collection('orders')
+          .where('timestamp',
+              isGreaterThanOrEqualTo:
+                  Timestamp.fromDate(_selectedDateRange!.start))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(_selectedDateRange!.end))
+          .orderBy('timestamp', descending: true)
+          .snapshots();
     }
     switch (_selectedPeriod) {
       case 'Daily':
-        return _receipts.where((receipt) {
-          final receiptDate = receipt['date'] as DateTime;
-          return receiptDate.year == now.year &&
-              receiptDate.month == now.month &&
-              receiptDate.day == now.day;
-        }).toList();
+        return _firestore
+            .collection('orders')
+            .where('timestamp',
+                isGreaterThanOrEqualTo:
+                    Timestamp.fromDate(DateTime(now.year, now.month, now.day)))
+            .where('timestamp',
+                isLessThanOrEqualTo: Timestamp.fromDate(
+                    DateTime(now.year, now.month, now.day + 1)))
+            .orderBy('timestamp', descending: true)
+            .snapshots();
       case 'Weekly':
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-        return _receipts.where((receipt) {
-          final receiptDate = receipt['date'] as DateTime;
-          return receiptDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
-              receiptDate.isBefore(startOfWeek.add(Duration(days: 7)));
-        }).toList();
+        return _firestore
+            .collection('orders')
+            .where('timestamp',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+            .where('timestamp',
+                isLessThanOrEqualTo:
+                    Timestamp.fromDate(startOfWeek.add(Duration(days: 7))))
+            .orderBy('timestamp', descending: true)
+            .snapshots();
       case 'Monthly':
-        return _receipts.where((receipt) {
-          final receiptDate = receipt['date'] as DateTime;
-          return receiptDate.year == now.year && receiptDate.month == now.month;
-        }).toList();
+        return _firestore
+            .collection('orders')
+            .where('timestamp',
+                isGreaterThanOrEqualTo:
+                    Timestamp.fromDate(DateTime(now.year, now.month, 1)))
+            .where('timestamp',
+                isLessThanOrEqualTo:
+                    Timestamp.fromDate(DateTime(now.year, now.month + 1, 0)))
+            .orderBy('timestamp', descending: true)
+            .snapshots();
       default:
-        return _receipts;
+        return _firestore
+            .collection('orders')
+            .orderBy('timestamp', descending: true)
+            .snapshots();
     }
   }
 
-  Map<String, double> _calculateIncome() {
-    final filteredReceipts = _filteredReceipts();
+  Future<Map<String, double>> _calculateIncome() async {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     double dailyIncome = 0.0;
     double weeklyIncome = 0.0;
     double monthlyIncome = 0.0;
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
 
-    for (var receipt in _receipts) {
-      final receiptDate = receipt['date'] as DateTime;
-      final total = receipt['total'] as double;
+    final snapshot = await _firestore
+        .collection('orders')
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final receiptDate = (data['timestamp'] as Timestamp).toDate();
+      final total = (data['total'] as num).toDouble();
       if (receiptDate.year == now.year &&
           receiptDate.month == now.month &&
           receiptDate.day == now.day) {
@@ -140,21 +122,25 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     };
   }
 
-  List<Map<String, dynamic>> _generateSalesReport() {
-    final filteredReceipts = _filteredReceipts();
+  Future<List<Map<String, dynamic>>> _generateSalesReport() async {
+    final snapshot = await _getReceiptsStream().first;
+    final receipts = snapshot.docs
+        .map((doc) => {...doc.data() as Map<String, dynamic>, 'docId': doc.id})
+        .toList();
     final now = DateTime.now();
     final report = <Map<String, dynamic>>[];
 
     if (_selectedPeriod == 'Daily' || _selectedDateRange != null) {
       final grouped = <String, List<Map<String, dynamic>>>{};
-      for (var receipt in filteredReceipts) {
-        final date = receipt['date'] as DateTime;
+      for (var receipt in receipts) {
+        final date = (receipt['timestamp'] as Timestamp).toDate();
         final dateKey = DateFormat('MMM dd, yyyy').format(date);
         grouped[dateKey] = grouped[dateKey] ?? [];
         grouped[dateKey]!.add(receipt);
       }
       grouped.forEach((date, receipts) {
-        final totalSales = receipts.fold(0.0, (sum, r) => sum + r['total']);
+        final totalSales =
+            receipts.fold(0.0, (sum, r) => sum + (r['total'] as num));
         final transactions = receipts.length;
         report.add({
           'date': date,
@@ -168,14 +154,14 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       for (int i = 0; i < 4; i++) {
         final weekStart = startOfWeek.subtract(Duration(days: 7 * i));
         final weekEnd = weekStart.add(Duration(days: 6));
-        final receiptsInWeek = filteredReceipts.where((r) {
-          final date = r['date'] as DateTime;
+        final receiptsInWeek = receipts.where((r) {
+          final date = (r['timestamp'] as Timestamp).toDate();
           return date.isAfter(weekStart.subtract(Duration(days: 1))) &&
               date.isBefore(weekEnd.add(Duration(days: 1)));
         }).toList();
         if (receiptsInWeek.isNotEmpty) {
           final totalSales =
-              receiptsInWeek.fold(0.0, (sum, r) => sum + r['total']);
+              receiptsInWeek.fold(0.0, (sum, r) => sum + (r['total'] as num));
           final transactions = receiptsInWeek.length;
           report.add({
             'date': 'Week of ${DateFormat('MMM dd').format(weekStart)}',
@@ -189,13 +175,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     } else if (_selectedPeriod == 'Monthly') {
       for (int i = 0; i < 3; i++) {
         final month = DateTime(now.year, now.month - i, 1);
-        final receiptsInMonth = filteredReceipts.where((r) {
-          final date = r['date'] as DateTime;
+        final receiptsInMonth = receipts.where((r) {
+          final date = (r['timestamp'] as Timestamp).toDate();
           return date.year == month.year && date.month == month.month;
         }).toList();
         if (receiptsInMonth.isNotEmpty) {
           final totalSales =
-              receiptsInMonth.fold(0.0, (sum, r) => sum + r['total']);
+              receiptsInMonth.fold(0.0, (sum, r) => sum + (r['total'] as num));
           final transactions = receiptsInMonth.length;
           report.add({
             'date': DateFormat('MMMM yyyy').format(month),
@@ -214,7 +200,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2026),
+      lastDate: DateTime.now(),
       initialDateRange: _selectedDateRange,
       builder: (context, child) {
         return Theme(
@@ -237,11 +223,131 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     }
   }
 
+  Future<void> _exportToCSV() async {
+    try {
+      final snapshot = await _getReceiptsStream().first;
+      final receipts = snapshot.docs
+          .map(
+              (doc) => {...doc.data() as Map<String, dynamic>, 'docId': doc.id})
+          .toList();
+
+      List<List<dynamic>> csvData = [
+        ['Date', 'Total Sales (P)', 'Transactions', 'Avg. Transaction (P)'],
+      ];
+
+      final report = await _generateSalesReport();
+      for (var entry in report) {
+        csvData.add([
+          entry['date'],
+          entry['totalSales'].toStringAsFixed(2),
+          entry['transactions'],
+          entry['avgTransaction'].toStringAsFixed(2),
+        ]);
+      }
+
+      final csvString = const ListToCsvConverter().convert(csvData);
+      final bytes = utf8.encode(csvString);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download',
+            'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error exporting to CSV: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: festiveRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _printSalesReport() async {
+    final pdf = pw.Document();
+    try {
+      final report = await _generateSalesReport();
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Sales Report - $_selectedPeriod',
+                    style: pw.TextStyle(
+                        fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 10),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: const pw.FractionColumnWidth(0.4),
+                    1: const pw.FractionColumnWidth(0.2),
+                    2: const pw.FractionColumnWidth(0.2),
+                    3: const pw.FractionColumnWidth(0.2),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Text('Date',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Total Sales (P)',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Transactions',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Avg. Transaction (P)',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                    ...report.map((entry) => pw.TableRow(
+                          children: [
+                            pw.Text(entry['date'],
+                                style: const pw.TextStyle(fontSize: 10)),
+                            pw.Text(entry['totalSales'].toStringAsFixed(2),
+                                style: const pw.TextStyle(fontSize: 10)),
+                            pw.Text(entry['transactions'].toString(),
+                                style: const pw.TextStyle(fontSize: 10)),
+                            pw.Text(entry['avgTransaction'].toStringAsFixed(2),
+                                style: const pw.TextStyle(fontSize: 10)),
+                          ],
+                        )),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdf.save());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error printing report: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: festiveRed,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final income = _calculateIncome();
-    final salesReport = _generateSalesReport();
-
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
@@ -273,7 +379,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                items: ['Daily', 'Weekly', 'Monthly'].map((period) {
+                items: ['Daily', 'Weekly', 'Monthly', 'Custom'].map((period) {
                   return DropdownMenuItem(
                     value: period,
                     child: TextWidget(
@@ -304,6 +410,26 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               onPressed: () => _selectDateRange(context),
               fontSize: 12,
             ),
+            const SizedBox(width: 12),
+            ButtonWidget(
+              radius: 8,
+              width: 200,
+              color: Colors.white12,
+              textColor: Colors.white,
+              label: 'Export CSV',
+              onPressed: _exportToCSV,
+              fontSize: 12,
+            ),
+            const SizedBox(width: 12),
+            ButtonWidget(
+              radius: 8,
+              width: 200,
+              color: Colors.white12,
+              textColor: Colors.white,
+              label: 'Print Report',
+              onPressed: _printSalesReport,
+              fontSize: 12,
+            ),
           ],
         ),
       ),
@@ -312,50 +438,68 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Income Summary
             Expanded(
               flex: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextWidget(
-                    text: 'Income Summary',
-                    fontSize: 18,
-                    fontFamily: 'Bold',
-                    color: primaryBlue,
-                    isBold: true,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildIncomeCard(
-                          title: 'Daily Income',
-                          amount: income['daily']!,
-                          icon: Icons.today,
-                        ),
+              child: FutureBuilder<Map<String, double>>(
+                future: _calculateIncome(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: TextWidget(
+                        text: 'Error: ${snapshot.error}',
+                        fontSize: 16,
+                        fontFamily: 'Regular',
+                        color: festiveRed,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildIncomeCard(
-                          title: 'Weekly Income',
-                          amount: income['weekly']!,
-                          icon: Icons.calendar_view_week,
-                        ),
+                    );
+                  }
+                  final income = snapshot.data ??
+                      {'daily': 0.0, 'weekly': 0.0, 'monthly': 0.0};
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        text: 'Income Summary',
+                        fontSize: 18,
+                        fontFamily: 'Bold',
+                        color: primaryBlue,
+                        isBold: true,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildIncomeCard(
+                              title: 'Daily Income',
+                              amount: income['daily']!,
+                              icon: Icons.today,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildIncomeCard(
+                              title: 'Weekly Income',
+                              amount: income['weekly']!,
+                              icon: Icons.calendar_view_week,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildIncomeCard(
+                        title: 'Monthly Income',
+                        amount: income['monthly']!,
+                        icon: Icons.calendar_month,
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildIncomeCard(
-                    title: 'Monthly Income',
-                    amount: income['monthly']!,
-                    icon: Icons.calendar_month,
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(width: 16),
-            // Sales Report Table
             Expanded(
               flex: 1,
               child: Card(
@@ -377,87 +521,128 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                       ),
                       const SizedBox(height: 12),
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: DataTable(
-                            columnSpacing: 16,
-                            dataRowHeight: 60,
-                            headingRowColor: WidgetStatePropertyAll(
-                                primaryBlue.withOpacity(0.1)),
-                            columns: [
-                              DataColumn(
-                                label: TextWidget(
-                                  text: 'Date',
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: _getReceiptsStream(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Center(
+                                child: TextWidget(
+                                  text: 'Error: ${snapshot.error}',
                                   fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: primaryBlue,
+                                  fontFamily: 'Regular',
+                                  color: festiveRed,
                                 ),
-                              ),
-                              DataColumn(
-                                label: TextWidget(
-                                  text: 'Total Sales (P)',
-                                  fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: primaryBlue,
-                                ),
-                              ),
-                              DataColumn(
-                                label: TextWidget(
-                                  text: 'Transactions',
-                                  fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: primaryBlue,
-                                ),
-                              ),
-                              DataColumn(
-                                label: TextWidget(
-                                  text: 'Avg. Transaction (P)',
-                                  fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: primaryBlue,
-                                ),
-                              ),
-                            ],
-                            rows: salesReport.map((report) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(
-                                    TextWidget(
-                                      text: report['date'],
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    TextWidget(
-                                      text: report['totalSales']
-                                          .toStringAsFixed(2),
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    TextWidget(
-                                      text: report['transactions'].toString(),
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    TextWidget(
-                                      text: report['avgTransaction']
-                                          .toStringAsFixed(2),
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                ],
                               );
-                            }).toList(),
-                          ),
+                            }
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                  child: CircularProgressIndicator());
+                            }
+                            return FutureBuilder<List<Map<String, dynamic>>>(
+                              future: _generateSalesReport(),
+                              builder: (context, reportSnapshot) {
+                                if (reportSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (reportSnapshot.hasError) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'Error: ${reportSnapshot.error}',
+                                      fontSize: 16,
+                                      fontFamily: 'Regular',
+                                      color: festiveRed,
+                                    ),
+                                  );
+                                }
+                                final salesReport = reportSnapshot.data ?? [];
+                                return SingleChildScrollView(
+                                  child: DataTable(
+                                    columnSpacing: 16,
+                                    dataRowHeight: 60,
+                                    headingRowColor: WidgetStatePropertyAll(
+                                        primaryBlue.withOpacity(0.1)),
+                                    columns: [
+                                      DataColumn(
+                                        label: TextWidget(
+                                          text: 'Date',
+                                          fontSize: 16,
+                                          fontFamily: 'Bold',
+                                          color: primaryBlue,
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: TextWidget(
+                                          text: 'Total Sales (P)',
+                                          fontSize: 16,
+                                          fontFamily: 'Bold',
+                                          color: primaryBlue,
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: TextWidget(
+                                          text: 'Transactions',
+                                          fontSize: 16,
+                                          fontFamily: 'Bold',
+                                          color: primaryBlue,
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: TextWidget(
+                                          text: 'Avg. Transaction (P)',
+                                          fontSize: 16,
+                                          fontFamily: 'Bold',
+                                          color: primaryBlue,
+                                        ),
+                                      ),
+                                    ],
+                                    rows: salesReport.map((report) {
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            TextWidget(
+                                              text: report['date'],
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                          DataCell(
+                                            TextWidget(
+                                              text: report['totalSales']
+                                                  .toStringAsFixed(2),
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                          DataCell(
+                                            TextWidget(
+                                              text: report['transactions']
+                                                  .toString(),
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                          DataCell(
+                                            TextWidget(
+                                              text: report['avgTransaction']
+                                                  .toStringAsFixed(2),
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                       ),
                     ],
