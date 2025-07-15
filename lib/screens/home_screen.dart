@@ -155,6 +155,8 @@ class _HomeScreenState extends State<HomeScreen>
         'total': _subtotal,
         'status': 'Accepted',
         'timestamp': FieldValue.serverTimestamp(),
+        'type': '',
+        'branch': ''
       });
       await batch.commit();
       setState(() {
