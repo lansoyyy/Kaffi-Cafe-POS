@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 
@@ -18,7 +19,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   File? _logoImage;
   String? _logoUrl;
-  Color _selectedColor = bayanihanBlue;
+  Color _selectedColor = AppTheme.primaryColor;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
@@ -49,7 +50,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _contactController.text = data['contact'] ?? '+639639520422';
           _openHoursController.text = data['openHours'] ?? 'Mon-Sun, 7AM-9PM';
           _logoUrl = data['logoUrl'];
-          _selectedColor = Color(data['primaryColor'] ?? bayanihanBlue.value);
+          _selectedColor =
+              Color(data['primaryColor'] ?? AppTheme.primaryColor.value);
+          // Update the app theme with the loaded color
+          AppTheme.updatePrimaryColor(_selectedColor);
         });
       }
     } catch (e) {
@@ -113,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           text: 'Select Primary Color',
           fontSize: 20,
           fontFamily: 'Bold',
-          color: bayanihanBlue,
+          color: AppTheme.primaryColor,
           isBold: true,
         ),
         content: SingleChildScrollView(
@@ -127,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
             availableColors: [
-              bayanihanBlue,
+              AppTheme.primaryColor,
               Colors.red,
               Colors.green,
               Colors.blue,
@@ -152,7 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               text: 'Cancel',
               fontSize: 16,
               fontFamily: 'Medium',
-              color: bayanihanBlue,
+              color: AppTheme.primaryColor,
             ),
           ),
           ElevatedButton(
@@ -160,7 +164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: bayanihanBlue,
+              backgroundColor: AppTheme.primaryColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -209,6 +213,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'primaryColor': _selectedColor.value,
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      // Update the app theme with the new color
+      AppTheme.updatePrimaryColor(_selectedColor);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
@@ -217,7 +224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             fontFamily: 'Medium',
             color: Colors.white,
           ),
-          backgroundColor: bayanihanBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -250,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: TextWidget(
@@ -277,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       text: 'App Logo',
                       fontSize: 22,
                       fontFamily: 'Bold',
-                      color: bayanihanBlue,
+                      color: AppTheme.primaryColor,
                       isBold: true,
                     ),
                     const SizedBox(height: 16),
@@ -285,7 +292,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       elevation: 6,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(color: bayanihanBlue.withOpacity(0.3)),
+                        side: BorderSide(
+                            color: AppTheme.primaryColor.withOpacity(0.3)),
                       ),
                       child: Container(
                         decoration: BoxDecoration(
@@ -295,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             end: Alignment.bottomRight,
                             colors: [
                               Colors.white,
-                              bayanihanBlue.withOpacity(0.1),
+                              AppTheme.primaryColor.withOpacity(0.1),
                             ],
                           ),
                         ),
@@ -345,7 +353,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                     BorderRadius.circular(16),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: bayanihanBlue
+                                                    color: AppTheme.primaryColor
                                                         .withOpacity(0.4),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 4),
@@ -374,7 +382,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                 BorderRadius.circular(16),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: bayanihanBlue
+                                                color: AppTheme.primaryColor
                                                     .withOpacity(0.4),
                                                 blurRadius: 8,
                                                 offset: const Offset(0, 4),
@@ -396,13 +404,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ElevatedButton(
                               onPressed: _pickLogoImage,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: bayanihanBlue,
+                                backgroundColor: AppTheme.primaryColor,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12)),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 32, vertical: 16),
                                 elevation: 3,
-                                shadowColor: bayanihanBlue.withOpacity(0.5),
+                                shadowColor:
+                                    AppTheme.primaryColor.withOpacity(0.5),
                               ),
                               child: TextWidget(
                                 text: 'Select Logo',
@@ -420,7 +429,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       text: 'Color Palette',
                       fontSize: 22,
                       fontFamily: 'Bold',
-                      color: bayanihanBlue,
+                      color: AppTheme.primaryColor,
                       isBold: true,
                     ),
                     const SizedBox(height: 16),
@@ -428,7 +437,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       elevation: 6,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(color: bayanihanBlue.withOpacity(0.3)),
+                        side: BorderSide(
+                            color: AppTheme.primaryColor.withOpacity(0.3)),
                       ),
                       child: Container(
                         decoration: BoxDecoration(
@@ -438,7 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             end: Alignment.bottomRight,
                             colors: [
                               Colors.white,
-                              bayanihanBlue.withOpacity(0.1),
+                              AppTheme.primaryColor.withOpacity(0.1),
                             ],
                           ),
                         ),
@@ -453,7 +463,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 color: _selectedColor,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                    color: bayanihanBlue.withOpacity(0.4),
+                                    color:
+                                        AppTheme.primaryColor.withOpacity(0.4),
                                     width: 2),
                                 boxShadow: [
                                   BoxShadow(
@@ -476,13 +487,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ElevatedButton(
                               onPressed: _showColorPickerDialog,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: bayanihanBlue,
+                                backgroundColor: AppTheme.primaryColor,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12)),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 32, vertical: 16),
                                 elevation: 3,
-                                shadowColor: bayanihanBlue.withOpacity(0.5),
+                                shadowColor:
+                                    AppTheme.primaryColor.withOpacity(0.5),
                               ),
                               child: TextWidget(
                                 text: 'Choose Color',
@@ -508,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       text: 'Business Details',
                       fontSize: 22,
                       fontFamily: 'Bold',
-                      color: bayanihanBlue,
+                      color: AppTheme.primaryColor,
                       isBold: true,
                     ),
                     const SizedBox(height: 16),
@@ -516,7 +528,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       elevation: 6,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(color: bayanihanBlue.withOpacity(0.3)),
+                        side: BorderSide(
+                            color: AppTheme.primaryColor.withOpacity(0.3)),
                       ),
                       child: Container(
                         decoration: BoxDecoration(
@@ -526,7 +539,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             end: Alignment.bottomRight,
                             colors: [
                               Colors.white,
-                              bayanihanBlue.withOpacity(0.1),
+                              AppTheme.primaryColor.withOpacity(0.1),
                             ],
                           ),
                         ),
@@ -547,17 +560,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue, width: 2),
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 16),
@@ -585,17 +600,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue, width: 2),
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 16),
@@ -622,17 +639,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue, width: 2),
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 16),
@@ -659,17 +678,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue, width: 2),
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 16),
@@ -696,17 +717,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue.withOpacity(0.3)),
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: bayanihanBlue, width: 2),
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 16),
@@ -732,7 +755,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _saveSettings,
-        backgroundColor: bayanihanBlue,
+        backgroundColor: AppTheme.primaryColor,
         elevation: 4,
         icon: const Icon(Icons.save, color: Colors.white),
         label: TextWidget(

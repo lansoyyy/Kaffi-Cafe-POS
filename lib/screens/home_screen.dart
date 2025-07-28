@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -33,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: categories.length, vsync: this);
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+        _searchQuery = _searchController.text;
       });
     });
     _amountController.addListener(_calculateChange);
@@ -208,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primaryBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -280,20 +281,10 @@ class _HomeScreenState extends State<HomeScreen>
         controller: _tabController,
         children: categories.map((category) {
           return StreamBuilder<QuerySnapshot>(
-            stream: _searchQuery.isEmpty
-                ? _firestore
-                    .collection('products')
-                    .where('category', isEqualTo: category)
-                    .orderBy('timestamp', descending: true)
-                    .snapshots()
-                : _firestore
-                    .collection('products')
-                    .where('category', isEqualTo: category)
-                    .where('searchName', isGreaterThanOrEqualTo: _searchQuery)
-                    .where('searchName',
-                        isLessThanOrEqualTo: '$_searchQuery\uf8ff')
-                    .orderBy('searchName')
-                    .snapshots(),
+            stream: _firestore
+                .collection('products')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
@@ -309,6 +300,23 @@ class _HomeScreenState extends State<HomeScreen>
                 return const Center(child: CircularProgressIndicator());
               }
               final products = snapshot.data!.docs;
+              // Filter products by category and search query
+              final filteredProducts = products.where((product) {
+                final data = product.data() as Map<String, dynamic>;
+                final productName =
+                    (data['name'] as String?)?.toLowerCase() ?? '';
+                final productCategory = data['category'] as String? ?? '';
+
+                // Always filter by category
+                if (productCategory != category) return false;
+
+                // If searching, also filter by name
+                if (_searchQuery.isNotEmpty) {
+                  return productName.contains(_searchQuery.toLowerCase());
+                }
+
+                return true;
+              }).toList();
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -316,71 +324,103 @@ class _HomeScreenState extends State<HomeScreen>
                     flex: 3,
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.8,
-                        ),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          final product = products[index];
-                          final data = product.data() as Map<String, dynamic>;
-                          return TouchableWidget(
-                            onTap: () => _addToCart({
-                              'name': data['name'] ?? 'Unnamed',
-                              'price':
-                                  (data['price'] as num?)?.toDouble() ?? 0.0,
-                              'category': data['category'] ?? 'Foods',
-                              'docId': product.id,
-                            }),
-                            child: Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      child: filteredProducts.isEmpty && _searchQuery.isNotEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextWidget(
+                                    text:
+                                        'No products found for "$_searchQuery"',
+                                    fontSize: 18,
+                                    fontFamily: 'Medium',
+                                    color: Colors.grey[600],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextWidget(
+                                    text: 'Try a different search term',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[500],
+                                  ),
+                                ],
                               ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 30,
-                                      backgroundColor:
-                                          primaryBlue.withOpacity(0.1),
-                                      child: Icon(
-                                        _getCategoryIcon(
-                                            data['category'] ?? 'Foods'),
-                                        size: 40,
-                                        color: primaryBlue,
+                            )
+                          : GridView.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 5,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 0.8,
+                              ),
+                              itemCount: filteredProducts.length,
+                              itemBuilder: (context, index) {
+                                final product = filteredProducts[index];
+                                final data =
+                                    product.data() as Map<String, dynamic>;
+                                return TouchableWidget(
+                                  onTap: () => _addToCart({
+                                    'name': data['name'] ?? 'Unnamed',
+                                    'price':
+                                        (data['price'] as num?)?.toDouble() ??
+                                            0.0,
+                                    'category': data['category'] ?? 'Foods',
+                                    'docId': product.id,
+                                  }),
+                                  child: Card(
+                                    elevation: 4,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 30,
+                                            backgroundColor: AppTheme
+                                                .primaryColor
+                                                .withOpacity(0.1),
+                                            child: Icon(
+                                              _getCategoryIcon(
+                                                  data['category'] ?? 'Foods'),
+                                              size: 40,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextWidget(
+                                            text: data['name'] ?? 'Unnamed',
+                                            fontSize: 16,
+                                            fontFamily: 'Medium',
+                                            color: Colors.grey[800],
+                                          ),
+                                          TextWidget(
+                                            text:
+                                                'P${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[600],
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
-                                    TextWidget(
-                                      text: data['name'] ?? 'Unnamed',
-                                      fontSize: 16,
-                                      fontFamily: 'Medium',
-                                      color: Colors.grey[800],
-                                    ),
-                                    TextWidget(
-                                      text:
-                                          'P${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[600],
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                   Container(
@@ -431,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen>
                                               text: 'x${item['quantity']}',
                                               fontSize: 16,
                                               fontFamily: 'Bold',
-                                              color: primaryBlue,
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
                                           const SizedBox(width: 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -22,7 +23,7 @@ class _OrderScreenState extends State<OrderScreen> {
     super.initState();
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+        _searchQuery = _searchController.text;
       });
     });
   }
@@ -59,7 +60,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -73,7 +74,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -88,7 +89,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -103,7 +104,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -162,11 +163,11 @@ class _OrderScreenState extends State<OrderScreen> {
                         fontFamily: 'Regular',
                         color: Colors.white,
                       ),
-                      backgroundColor: bayanihanBlue,
+                      backgroundColor: AppTheme.primaryColor,
                     ),
                   );
                 },
-                color: bayanihanBlue,
+                color: AppTheme.primaryColor,
                 textColor: Colors.white,
                 fontSize: 14,
                 radius: 8,
@@ -224,7 +225,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       fontFamily: 'Regular',
                       color: Colors.white,
                     ),
-                    backgroundColor: bayanihanBlue,
+                    backgroundColor: AppTheme.primaryColor,
                   ),
                 );
               } catch (e) {
@@ -242,7 +243,7 @@ class _OrderScreenState extends State<OrderScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: bayanihanBlue,
+              backgroundColor: AppTheme.primaryColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
@@ -273,7 +274,7 @@ class _OrderScreenState extends State<OrderScreen> {
             fontFamily: 'Regular',
             color: Colors.white,
           ),
-          backgroundColor: bayanihanBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -303,7 +304,7 @@ class _OrderScreenState extends State<OrderScreen> {
             fontFamily: 'Regular',
             color: Colors.white,
           ),
-          backgroundColor: bayanihanBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -326,7 +327,7 @@ class _OrderScreenState extends State<OrderScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -372,7 +373,7 @@ class _OrderScreenState extends State<OrderScreen> {
             label: 'Add Order',
             onPressed: () => _showAddOrderDialog(context),
             color: Colors.white,
-            textColor: bayanihanBlue,
+            textColor: AppTheme.primaryColor,
             fontSize: 14,
             radius: 10,
             height: 40,

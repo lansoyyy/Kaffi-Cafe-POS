@@ -7,6 +7,7 @@ import 'package:kaffi_cafe_pos/screens/reservation_screen.dart';
 import 'package:kaffi_cafe_pos/screens/settings_screen.dart';
 import 'package:kaffi_cafe_pos/screens/transaction_screen.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/divider_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 
@@ -19,7 +20,7 @@ class DrawerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 280,
-      color: bayanihanBlue,
+      color: AppTheme.primaryColor,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),

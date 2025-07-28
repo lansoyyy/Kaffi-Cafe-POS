@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -48,7 +49,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryBlue,
+              primary: AppTheme.primaryColor,
               onPrimary: Colors.white,
             ),
             dialogBackgroundColor: Colors.white,
@@ -74,7 +75,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           text: 'Receipt Details - ${receipt['orderId']}',
           fontSize: 18,
           fontFamily: 'Bold',
-          color: primaryBlue,
+          color: AppTheme.primaryColor,
           isBold: true,
         ),
         content: SingleChildScrollView(
@@ -131,7 +132,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         actions: [
           ButtonWidget(
             radius: 8,
-            color: primaryBlue,
+            color: AppTheme.primaryColor,
             textColor: Colors.white,
             label: 'Close',
             onPressed: () => Navigator.pop(context),
@@ -205,7 +206,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: primaryBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -266,7 +267,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                             text: 'Filter Receipts',
                             fontSize: 16,
                             fontFamily: 'Bold',
-                            color: primaryBlue,
+                            color: AppTheme.primaryColor,
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -283,7 +284,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               ),
                               ButtonWidget(
                                 radius: 8,
-                                color: primaryBlue,
+                                color: AppTheme.primaryColor,
                                 textColor: Colors.white,
                                 label: 'Select Date Range',
                                 onPressed: () => _selectDateRange(context),
@@ -411,14 +412,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         columnSpacing: 16,
                         dataRowHeight: 60,
                         headingRowColor: WidgetStatePropertyAll(
-                            primaryBlue.withOpacity(0.1)),
+                            AppTheme.primaryColor.withOpacity(0.1)),
                         columns: [
                           DataColumn(
                             label: TextWidget(
                               text: 'Receipt ID',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           DataColumn(
@@ -426,7 +427,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               text: 'Date',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           DataColumn(
@@ -434,7 +435,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               text: 'Customer',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           DataColumn(
@@ -442,7 +443,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               text: 'Payment',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           DataColumn(
@@ -450,7 +451,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               text: 'Total (P)',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           DataColumn(
@@ -458,7 +459,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                               text: 'Actions',
                               fontSize: 16,
                               fontFamily: 'Bold',
-                              color: primaryBlue,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                         ],
@@ -514,7 +515,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                                   children: [
                                     ButtonWidget(
                                       radius: 8,
-                                      color: primaryBlue,
+                                      color: AppTheme.primaryColor,
                                       textColor: Colors.white,
                                       label: 'Details',
                                       onPressed: () =>
@@ -525,7 +526,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                                     ButtonWidget(
                                       radius: 8,
                                       color: Colors.grey[200]!,
-                                      textColor: primaryBlue,
+                                      textColor: AppTheme.primaryColor,
                                       label: 'Print',
                                       onPressed: () => _printReceipt(receipt),
                                       fontSize: 12,

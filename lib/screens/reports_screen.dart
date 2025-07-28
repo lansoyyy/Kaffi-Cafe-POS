@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -206,7 +207,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryBlue,
+              primary: AppTheme.primaryColor,
               onPrimary: Colors.white,
             ),
             dialogBackgroundColor: Colors.white,
@@ -351,7 +352,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: primaryBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -368,7 +369,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               width: 200,
               child: DropdownButtonFormField<String>(
                 value: _selectedPeriod,
-                dropdownColor: bayanihanBlue,
+                dropdownColor: AppTheme.primaryColor,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white12,
@@ -465,7 +466,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         text: 'Income Summary',
                         fontSize: 18,
                         fontFamily: 'Bold',
-                        color: primaryBlue,
+                        color: AppTheme.primaryColor,
                         isBold: true,
                       ),
                       const SizedBox(height: 12),
@@ -516,7 +517,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         text: 'Sales Report',
                         fontSize: 18,
                         fontFamily: 'Bold',
-                        color: primaryBlue,
+                        color: AppTheme.primaryColor,
                         isBold: true,
                       ),
                       const SizedBox(height: 12),
@@ -562,14 +563,14 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                     columnSpacing: 16,
                                     dataRowHeight: 60,
                                     headingRowColor: WidgetStatePropertyAll(
-                                        primaryBlue.withOpacity(0.1)),
+                                        AppTheme.primaryColor.withOpacity(0.1)),
                                     columns: [
                                       DataColumn(
                                         label: TextWidget(
                                           text: 'Date',
                                           fontSize: 16,
                                           fontFamily: 'Bold',
-                                          color: primaryBlue,
+                                          color: AppTheme.primaryColor,
                                         ),
                                       ),
                                       DataColumn(
@@ -577,7 +578,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                           text: 'Total Sales (P)',
                                           fontSize: 16,
                                           fontFamily: 'Bold',
-                                          color: primaryBlue,
+                                          color: AppTheme.primaryColor,
                                         ),
                                       ),
                                       DataColumn(
@@ -585,7 +586,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                           text: 'Transactions',
                                           fontSize: 16,
                                           fontFamily: 'Bold',
-                                          color: primaryBlue,
+                                          color: AppTheme.primaryColor,
                                         ),
                                       ),
                                       DataColumn(
@@ -593,7 +594,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                           text: 'Avg. Transaction (P)',
                                           fontSize: 16,
                                           fontFamily: 'Bold',
-                                          color: primaryBlue,
+                                          color: AppTheme.primaryColor,
                                         ),
                                       ),
                                     ],
@@ -671,10 +672,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: primaryBlue.withOpacity(0.1),
+              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
               child: Icon(
                 icon,
-                color: primaryBlue,
+                color: AppTheme.primaryColor,
                 size: 24,
               ),
             ),
@@ -692,7 +693,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   text: 'P${amount.toStringAsFixed(2)}',
                   fontSize: 20,
                   fontFamily: 'Bold',
-                  color: primaryBlue,
+                  color: AppTheme.primaryColor,
                   isBold: true,
                 ),
               ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -23,7 +24,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.initState();
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+        _searchQuery = _searchController.text;
       });
     });
   }
@@ -56,7 +57,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: primaryBlue, width: 2),
+                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
             ),
@@ -71,7 +72,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: primaryBlue, width: 2),
+                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
             ),
@@ -150,7 +151,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryBlue,
+              backgroundColor: AppTheme.primaryColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
@@ -197,7 +198,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -211,7 +212,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 items: ['Coffee', 'Drinks', 'Foods'].map((category) {
@@ -240,7 +241,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -255,7 +256,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -339,7 +340,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryBlue,
+              backgroundColor: AppTheme.primaryColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
@@ -366,7 +367,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             fontFamily: 'Regular',
             color: Colors.white,
           ),
-          backgroundColor: primaryBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -395,7 +396,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             fontFamily: 'Regular',
             color: Colors.white,
           ),
-          backgroundColor: primaryBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -431,7 +432,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: primaryBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: Row(
@@ -494,7 +495,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                       ButtonWidget(
                         radius: 12,
-                        color: primaryBlue,
+                        color: AppTheme.primaryColor,
                         textColor: Colors.white,
                         label: 'Add Ingredient',
                         onPressed: () {
@@ -625,7 +626,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             },
                                             icon: Icon(
                                               Icons.edit,
-                                              color: primaryBlue,
+                                              color: AppTheme.primaryColor,
                                               size: 26,
                                             ),
                                             tooltip: 'Update Ingredient',
@@ -675,7 +676,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                       ButtonWidget(
                         radius: 12,
-                        color: primaryBlue,
+                        color: AppTheme.primaryColor,
                         textColor: Colors.white,
                         label: 'Add Product',
                         onPressed: () {
@@ -701,39 +702,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   const SizedBox(height: 12),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: _searchQuery.isEmpty
-                          ? (_selectedCategory == 'All'
-                              ? _firestore
-                                  .collection('products')
-                                  .orderBy('timestamp', descending: true)
-                                  .snapshots()
-                              : _firestore
-                                  .collection('products')
-                                  .where('category',
-                                      isEqualTo: _selectedCategory)
-                                  .orderBy('timestamp', descending: true)
-                                  .snapshots())
-                          : (_selectedCategory == 'All'
-                              ? _firestore
-                                  .collection('products')
-                                  .where('searchName',
-                                      isGreaterThanOrEqualTo: _searchQuery)
-                                  .where('searchName',
-                                      isLessThanOrEqualTo:
-                                          '$_searchQuery\uf8ff')
-                                  .orderBy('searchName')
-                                  .snapshots()
-                              : _firestore
-                                  .collection('products')
-                                  .where('category',
-                                      isEqualTo: _selectedCategory)
-                                  .where('searchName',
-                                      isGreaterThanOrEqualTo: _searchQuery)
-                                  .where('searchName',
-                                      isLessThanOrEqualTo:
-                                          '$_searchQuery\uf8ff')
-                                  .orderBy('searchName')
-                                  .snapshots()),
+                      stream: _firestore
+                          .collection('products')
+                          .orderBy('timestamp', descending: true)
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
                           return Center(
@@ -750,10 +722,65 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               child: CircularProgressIndicator());
                         }
                         final products = snapshot.data!.docs;
+
+                        // Filter products by category and search query
+                        final filteredProducts = products.where((product) {
+                          final data = product.data() as Map<String, dynamic>;
+                          final productName =
+                              (data['name'] as String?)?.toLowerCase() ?? '';
+                          final productCategory =
+                              data['category'] as String? ?? '';
+
+                          // Filter by category if not 'All'
+                          if (_selectedCategory != 'All' &&
+                              productCategory != _selectedCategory) {
+                            return false;
+                          }
+
+                          // If searching, also filter by name
+                          if (_searchQuery.isNotEmpty) {
+                            return productName
+                                .contains(_searchQuery.toLowerCase());
+                          }
+
+                          return true;
+                        }).toList();
+
+                        // Show "No results found" message if no products match
+                        if (filteredProducts.isEmpty &&
+                            _searchQuery.isNotEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                TextWidget(
+                                  text: 'No products found for "$_searchQuery"',
+                                  fontSize: 18,
+                                  fontFamily: 'Medium',
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(height: 8),
+                                TextWidget(
+                                  text: 'Try a different search term',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.grey[500],
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
                         return ListView.builder(
-                          itemCount: products.length,
+                          itemCount: filteredProducts.length,
                           itemBuilder: (context, index) {
-                            final product = products[index];
+                            final product = filteredProducts[index];
                             final data = product.data() as Map<String, dynamic>;
                             final isLowStock = (data['stock'] as num) < 20;
                             return Padding(
@@ -785,11 +812,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           CircleAvatar(
                                             radius: 20,
                                             backgroundColor:
-                                                primaryBlue.withOpacity(0.1),
+                                                AppTheme.primaryColor.withOpacity(0.1),
                                             child: Icon(
                                               _getCategoryIcon(
                                                   data['category'] ?? 'Foods'),
-                                              color: primaryBlue,
+                                              color: AppTheme.primaryColor,
                                               size: 24,
                                             ),
                                           ),
@@ -874,7 +901,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             },
                                             icon: Icon(
                                               Icons.edit,
-                                              color: primaryBlue,
+                                              color: AppTheme.primaryColor,
                                               size: 26,
                                             ),
                                             tooltip: 'Update Product',
@@ -918,7 +945,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: ButtonWidget(
         width: 150,
         radius: 12,
-        color: isSelected ? primaryBlue : Colors.grey[200]!,
+        color: isSelected ? AppTheme.primaryColor : Colors.grey[200]!,
         textColor: isSelected ? Colors.white : Colors.grey[800],
         label: category,
         onPressed: () {

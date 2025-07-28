@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -55,7 +56,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: bayanihanBlue,
+              primary: AppTheme.primaryColor,
               onPrimary: plainWhite,
               surface: plainWhite,
               onSurface: textBlack,
@@ -148,7 +149,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       text: 'Status: ${reservation['status']}',
                       fontSize: fontSize + 2,
                       color: reservation['status'] == 'Confirmed'
-                          ? bayanihanBlue
+                          ? AppTheme.primaryColor
                           : festiveRed,
                       fontFamily: 'Regular',
                     ),
@@ -182,7 +183,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         color: plainWhite,
                         fontFamily: 'Regular',
                       ),
-                      backgroundColor: bayanihanBlue,
+                      backgroundColor: AppTheme.primaryColor,
                     ),
                   );
                 } catch (e) {
@@ -202,7 +203,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               },
               color: reservation['status'] == 'Confirmed'
                   ? festiveRed
-                  : bayanihanBlue,
+                  : AppTheme.primaryColor,
               textColor: plainWhite,
               fontSize: fontSize + 1,
               height: 45,
@@ -216,7 +217,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 Navigator.of(context).pop();
                 _showEditReservationDialog(context, seat);
               },
-              color: bayanihanBlue,
+              color: AppTheme.primaryColor,
               textColor: plainWhite,
               fontSize: fontSize + 1,
               height: 45,
@@ -290,7 +291,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -314,7 +315,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -412,7 +413,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       color: plainWhite,
                       fontFamily: 'Regular',
                     ),
-                    backgroundColor: bayanihanBlue,
+                    backgroundColor: AppTheme.primaryColor,
                   ),
                 );
               } catch (e) {
@@ -429,7 +430,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 );
               }
             },
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
             textColor: plainWhite,
             fontSize: fontSize + 1,
             height: 45,
@@ -480,7 +481,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -504,7 +505,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: bayanihanBlue, width: 2),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -589,7 +590,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       color: plainWhite,
                       fontFamily: 'Regular',
                     ),
-                    backgroundColor: bayanihanBlue,
+                    backgroundColor: AppTheme.primaryColor,
                   ),
                 );
               } catch (e) {
@@ -606,7 +607,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 );
               }
             },
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
             textColor: plainWhite,
             fontSize: fontSize + 1,
             height: 45,
@@ -673,7 +674,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: plainWhite,
         elevation: 4,
         title: TextWidget(
@@ -715,7 +716,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         color: plainWhite,
                         boxShadow: [
                           BoxShadow(
-                            color: bayanihanBlue.withOpacity(0.1),
+                            color: AppTheme.primaryColor.withOpacity(0.1),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -735,7 +736,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           ButtonWidget(
                             label: 'Pick Date',
                             onPressed: () => _selectDate(context),
-                            color: bayanihanBlue,
+                            color: AppTheme.primaryColor,
                             textColor: plainWhite,
                             fontSize: fontSize + 1,
                             height: 50,
@@ -780,11 +781,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           }
                         },
                         backgroundColor: cloudWhite,
-                        selectedColor: bayanihanBlue,
+                        selectedColor: AppTheme.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                           side: BorderSide(
-                            color: isSelected ? bayanihanBlue : ashGray,
+                            color: isSelected ? AppTheme.primaryColor : ashGray,
                             width: 1.5,
                           ),
                         ),
@@ -838,7 +839,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                             _numberOfGuests++;
                           });
                         },
-                        color: bayanihanBlue,
+                        color: AppTheme.primaryColor,
                         textColor: plainWhite,
                         fontSize: fontSize + 1,
                         height: 50,
@@ -945,7 +946,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                       : ashGray.withOpacity(0.3),
                                   border: Border.all(
                                     color: isSelected
-                                        ? bayanihanBlue
+                                        ? AppTheme.primaryColor
                                         : isAvailable
                                             ? palmGreen
                                             : festiveRed,
@@ -981,7 +982,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                           : 'Occupied',
                                       fontSize: fontSize,
                                       color: isAvailable
-                                          ? bayanihanBlue
+                                          ? AppTheme.primaryColor
                                           : charcoalGray,
                                       isBold: true,
                                       fontFamily: 'Bold',
@@ -1003,7 +1004,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           ? () => _showCreateReservationDialog(context)
                           : () {},
                       color: _selectedTime != null && _selectedSeat != null
-                          ? bayanihanBlue
+                          ? AppTheme.primaryColor
                           : ashGray,
                       textColor: plainWhite,
                       fontSize: fontSize + 2,

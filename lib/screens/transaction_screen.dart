@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
+import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -43,7 +44,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
             fontFamily: 'Regular',
             color: Colors.white,
           ),
-          backgroundColor: bayanihanBlue,
+          backgroundColor: AppTheme.primaryColor,
         ),
       );
     } catch (e) {
@@ -201,7 +202,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
-        backgroundColor: bayanihanBlue,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         title: TextWidget(
@@ -273,14 +274,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                 'Transactions for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
                             fontSize: 18,
                             fontFamily: 'Bold',
-                            color: bayanihanBlue,
+                            color: AppTheme.primaryColor,
                           ),
                           Row(
                             children: [
                               ButtonWidget(
                                 width: 125,
                                 radius: 8,
-                                color: bayanihanBlue,
+                                color: AppTheme.primaryColor,
                                 textColor: Colors.white,
                                 label: 'Print Summary',
                                 onPressed: _printTransactionSummary,
@@ -290,7 +291,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                               ButtonWidget(
                                 width: 125,
                                 radius: 8,
-                                color: bayanihanBlue,
+                                color: AppTheme.primaryColor,
                                 textColor: Colors.white,
                                 label: 'Export CSV',
                                 onPressed: _exportToCSV,
@@ -374,12 +375,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                         text: category,
                                         fontSize: 20,
                                         fontFamily: 'Bold',
-                                        color: bayanihanBlue,
+                                        color: AppTheme.primaryColor,
                                       ),
                                       const SizedBox(height: 12),
                                       Table(
                                         border: TableBorder.all(
-                                          color: bayanihanBlue.withOpacity(0.2),
+                                          color: AppTheme.primaryColor.withOpacity(0.2),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),
@@ -422,7 +423,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   TableRow _buildTableHeader() {
     return TableRow(
       decoration: BoxDecoration(
-        color: bayanihanBlue.withOpacity(0.1),
+        color: AppTheme.primaryColor.withOpacity(0.1),
       ),
       children: [
         Padding(
@@ -431,7 +432,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
             text: 'Item',
             fontSize: 16,
             fontFamily: 'Bold',
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
           ),
         ),
         Padding(
@@ -440,7 +441,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
             text: 'Qty',
             fontSize: 16,
             fontFamily: 'Bold',
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
             align: TextAlign.center,
           ),
         ),
@@ -450,7 +451,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
             text: 'Price',
             fontSize: 16,
             fontFamily: 'Bold',
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
             align: TextAlign.right,
           ),
         ),
@@ -460,7 +461,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
             text: '',
             fontSize: 16,
             fontFamily: 'Bold',
-            color: bayanihanBlue,
+            color: AppTheme.primaryColor,
             align: TextAlign.center,
           ),
         ),
