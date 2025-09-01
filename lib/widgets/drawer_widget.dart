@@ -12,6 +12,7 @@ import 'package:kaffi_cafe_pos/widgets/divider_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 
 import '../screens/home_screen.dart';
+import '../screens/staff_screen.dart';
 
 class DrawerWidget extends StatelessWidget {
   const DrawerWidget({super.key});
@@ -190,7 +191,7 @@ class DrawerWidget extends StatelessWidget {
                 DividerWidget(),
                 ListTile(
                   leading: const Icon(
-                    Icons.receipt,
+                    Icons.group,
                     color: Colors.white,
                     size: 26,
                   ),
@@ -198,11 +199,11 @@ class DrawerWidget extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const ReceiptScreen()),
+                          builder: (context) => const StaffScreen()),
                     );
                   },
                   title: TextWidget(
-                    text: 'Receipt',
+                    text: 'Staff Management',
                     fontSize: 16,
                     fontFamily: 'Medium',
                     color: Colors.white,
@@ -237,84 +238,6 @@ class DrawerWidget extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                DividerWidget(),
-                // ListTile(
-                //   leading: const Icon(
-                //     Icons.inventory_2_outlined,
-                //     color: Colors.white,
-                //     size: 26,
-                //   ),
-                //   onTap: () {},
-                //   title: TextWidget(
-                //     text: 'Inventory',
-                //     fontSize: 16,
-                //     fontFamily: 'Medium',
-                //     color: Colors.white,
-                //   ),
-                //   hoverColor: Colors.white10,
-                //   shape: RoundedRectangleBorder(
-                //     borderRadius: BorderRadius.circular(8),
-                //   ),
-                // ),
-                // ListTile(
-                //   leading: const Icon(
-                //     Icons.bar_chart_rounded,
-                //     color: Colors.white,
-                //     size: 26,
-                //   ),
-                //   onTap: () {},
-                //   title: TextWidget(
-                //     text: 'Reports',
-                //     fontSize: 16,
-                //     fontFamily: 'Medium',
-                //     color: Colors.white,
-                //   ),
-                //   hoverColor: Colors.white10,
-                //   shape: RoundedRectangleBorder(
-                //     borderRadius: BorderRadius.circular(8),
-                //   ),
-                // ),
-                // ListTile(
-                //   leading: const Icon(
-                //     Icons.settings_outlined,
-                //     color: Colors.white,
-                //     size: 26,
-                //   ),
-                //   onTap: () {},
-                //   title: TextWidget(
-                //     text: 'Settings',
-                //     fontSize: 16,
-                //     fontFamily: 'Medium',
-                //     color: Colors.white,
-                //   ),
-                //   hoverColor: Colors.white10,
-                //   shape: RoundedRectangleBorder(
-                //     borderRadius: BorderRadius.circular(8),
-                //   ),
-                // ),
-                // const Spacer(),
-                // const Divider(color: Colors.white24, thickness: 1),
-                // const SizedBox(height: 10),
-                // ListTile(
-                //   leading: const Icon(
-                //     Icons.logout_rounded,
-                //     color: Colors.redAccent,
-                //     size: 26,
-                //   ),
-                //   onTap: () {
-                //     // Implement logout logic
-                //   },
-                //   title: TextWidget(
-                //     text: 'Logout',
-                //     fontSize: 16,
-                //     fontFamily: 'Medium',
-                //     color: Colors.redAccent,
-                //   ),
-                //   hoverColor: Colors.white10,
-                //   shape: RoundedRectangleBorder(
-                //     borderRadius: BorderRadius.circular(8),
-                //   ),
-                // ),
               ],
             ),
           ),

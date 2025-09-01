@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kaffi_cafe_pos/firebase_options.dart';
-import 'package:kaffi_cafe_pos/screens/home_screen.dart';
+import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 
 void main() async {
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Kaffi Cafe POS',
       theme: AppTheme.theme,
-      home: const HomeScreen(),
+      home: const StaffScreen(),
     );
   }
 }

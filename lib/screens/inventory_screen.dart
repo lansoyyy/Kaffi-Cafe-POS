@@ -5,6 +5,8 @@ import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -18,15 +20,48 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isLoggedIn = false;
+
+  final List<String> _categories = [
+    'All',
+    'Coffee',
+    'Non-Coffee Drinks',
+    'Pastries',
+    'Sandwiches',
+    'Add-ons'
+  ];
 
   @override
   void initState() {
     super.initState();
+    _checkLoginStatus();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text;
       });
     });
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('is_staff_logged_in') ?? false;
+
+    if (!isLoggedIn) {
+      // Redirect to staff login screen if not logged in
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const StaffScreen()),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = true;
+      });
+    }
   }
 
   void _showUpdateIngredientDialog(BuildContext context, String? docId,
@@ -57,7 +92,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  borderSide:
+                      BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
             ),
@@ -72,7 +108,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  borderSide:
+                      BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
             ),
@@ -198,7 +235,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -212,10 +250,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
-                items: ['Coffee', 'Drinks', 'Foods'].map((category) {
+                items: [
+                  'Coffee',
+                  'Non-Coffee Drinks',
+                  'Pastries',
+                  'Sandwiches',
+                  'Add-ons'
+                ].map((category) {
                   return DropdownMenuItem(
                     value: category,
                     child: TextWidget(
@@ -241,7 +286,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -256,7 +302,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -418,10 +465,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     switch (category) {
       case 'Coffee':
         return Icons.local_cafe;
-      case 'Drinks':
-        return Icons.local_drink;
-      case 'Foods':
-        return Icons.fastfood;
+      case 'Non-Coffee Drinks':
+        return Icons.local_bar;
+      case 'Pastries':
+        return Icons.cake;
+      case 'Sandwiches':
+        return Icons.lunch_dining;
+      case 'Add-ons':
+        return Icons.add_shopping_cart;
       default:
         return Icons.fastfood;
     }
@@ -429,6 +480,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isLoggedIn) {
+      // Show a loading indicator while checking login status
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       drawer: const DrawerWidget(),
       appBar: AppBar(
@@ -440,37 +498,41 @@ class _InventoryScreenState extends State<InventoryScreen> {
           children: [
             TextWidget(
               text: 'Inventory',
-              fontSize: 20,
+              fontSize: 24,
               fontFamily: 'Bold',
               color: Colors.white,
             ),
             const SizedBox(width: 20),
-            Container(
-              width: 350,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                  hintText: 'Search inventory...',
-                  hintStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontFamily: 'Regular',
-                    fontSize: 16,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            Expanded(
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                style: const TextStyle(color: Colors.white),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search,
+                        color: Colors.white70, size: 28),
+                    hintText: 'Search inventory...',
+                    hintStyle: const TextStyle(
+                      color: Colors.white70,
+                      fontFamily: 'Regular',
+                      fontSize: 18,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 20),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                ),
               ),
             ),
+            const SizedBox(width: 20),
           ],
         ),
       ),
@@ -480,188 +542,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Expanded(
             flex: 1,
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextWidget(
-                        text: 'Raw Ingredients',
-                        fontSize: 20,
-                        fontFamily: 'Bold',
-                        color: Colors.grey[800],
-                      ),
-                      ButtonWidget(
-                        radius: 12,
-                        color: AppTheme.primaryColor,
-                        textColor: Colors.white,
-                        label: 'Add Ingredient',
-                        onPressed: () {
-                          _showUpdateIngredientDialog(context, null, '', 0.0);
-                        },
-                        fontSize: 16,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: _searchQuery.isEmpty
-                          ? _firestore
-                              .collection('ingredients')
-                              .orderBy('timestamp', descending: true)
-                              .snapshots()
-                          : _firestore
-                              .collection('ingredients')
-                              .where('searchName',
-                                  isGreaterThanOrEqualTo: _searchQuery)
-                              .where('searchName',
-                                  isLessThanOrEqualTo: '$_searchQuery\uf8ff')
-                              .orderBy('searchName')
-                              .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: TextWidget(
-                              text: 'Error: ${snapshot.error}',
-                              fontSize: 16,
-                              fontFamily: 'Regular',
-                              color: Colors.red[600],
-                            ),
-                          );
-                        }
-                        if (!snapshot.hasData) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-                        final ingredients = snapshot.data!.docs;
-                        return ListView.builder(
-                          itemCount: ingredients.length,
-                          itemBuilder: (context, index) {
-                            final ingredient = ingredients[index];
-                            final data =
-                                ingredient.data() as Map<String, dynamic>;
-                            final isLowStock = (data['quantity'] as num) < 2;
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 8.0),
-                              child: Card(
-                                elevation: 5,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.all(20.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isLowStock
-                                          ? Colors.red[100]!
-                                          : Colors.transparent,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              TextWidget(
-                                                text: data['name'] ?? 'Unnamed',
-                                                fontSize: 18,
-                                                fontFamily: 'Medium',
-                                                color: Colors.grey[800],
-                                              ),
-                                              if (isLowStock) ...[
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.red[50],
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            6),
-                                                  ),
-                                                  child: TextWidget(
-                                                    text: 'Low Stock',
-                                                    fontSize: 12,
-                                                    fontFamily: 'Regular',
-                                                    color: Colors.red[600],
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                          TextWidget(
-                                            text:
-                                                'Quantity: ${data['quantity']} kg',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[600],
-                                          ),
-                                        ],
-                                      ),
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            onPressed: () {
-                                              _showUpdateIngredientDialog(
-                                                context,
-                                                ingredient.id,
-                                                data['name'] ?? '',
-                                                (data['quantity'] as num)
-                                                    .toDouble(),
-                                              );
-                                            },
-                                            icon: Icon(
-                                              Icons.edit,
-                                              color: AppTheme.primaryColor,
-                                              size: 26,
-                                            ),
-                                            tooltip: 'Update Ingredient',
-                                          ),
-                                          IconButton(
-                                            onPressed: () {
-                                              _deleteIngredient(ingredient.id);
-                                            },
-                                            icon: Icon(
-                                              Icons.delete,
-                                              color: Colors.red[400],
-                                              size: 26,
-                                            ),
-                                            tooltip: 'Delete Ingredient',
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -670,12 +551,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     children: [
                       TextWidget(
                         text: 'Menu Products',
-                        fontSize: 20,
+                        fontSize: 24,
                         fontFamily: 'Bold',
                         color: Colors.grey[800],
                       ),
                       ButtonWidget(
-                        radius: 12,
+                        radius: 16,
                         color: AppTheme.primaryColor,
                         textColor: Colors.white,
                         label: 'Add Product',
@@ -683,23 +564,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           _showUpdateProductDialog(
                               context, null, '', 0, 0.0, '');
                         },
-                        fontSize: 16,
+                        fontSize: 18,
+                        width: 180,
+                        height: 56,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildCategoryButton('All'),
-                        _buildCategoryButton('Coffee'),
-                        _buildCategoryButton('Drinks'),
-                        _buildCategoryButton('Foods'),
-                      ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 70,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: _categories.map((category) {
+                        return _buildCategoryButton(category);
+                      }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream: _firestore
@@ -711,7 +592,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           return Center(
                             child: TextWidget(
                               text: 'Error: ${snapshot.error}',
-                              fontSize: 16,
+                              fontSize: 18,
                               fontFamily: 'Regular',
                               color: Colors.red[600],
                             ),
@@ -755,20 +636,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               children: [
                                 Icon(
                                   Icons.search_off,
-                                  size: 64,
+                                  size: 80,
                                   color: Colors.grey[400],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                                 TextWidget(
                                   text: 'No products found for "$_searchQuery"',
-                                  fontSize: 18,
+                                  fontSize: 22,
                                   fontFamily: 'Medium',
                                   color: Colors.grey[600],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 TextWidget(
                                   text: 'Try a different search term',
-                                  fontSize: 14,
+                                  fontSize: 16,
                                   fontFamily: 'Regular',
                                   color: Colors.grey[500],
                                 ),
@@ -782,25 +663,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           itemBuilder: (context, index) {
                             final product = filteredProducts[index];
                             final data = product.data() as Map<String, dynamic>;
-                            final isLowStock = (data['stock'] as num) < 20;
+                            final isLowStock = (data['stock'] as num) < 10;
                             return Padding(
                               padding:
-                                  const EdgeInsets.symmetric(vertical: 8.0),
+                                  const EdgeInsets.symmetric(vertical: 10.0),
                               child: Card(
-                                elevation: 5,
+                                elevation: 6,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
                                 child: Container(
-                                  padding: const EdgeInsets.all(16.0),
+                                  padding: const EdgeInsets.all(20.0),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(18),
                                     border: Border.all(
                                       color: isLowStock
-                                          ? Colors.red[100]!
-                                          : Colors.transparent,
-                                      width: 1,
+                                          ? Colors.red[300]!
+                                          : Colors.grey[200]!,
+                                      width: 2,
                                     ),
                                   ),
                                   child: Row(
@@ -809,18 +690,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          CircleAvatar(
-                                            radius: 20,
-                                            backgroundColor:
-                                                AppTheme.primaryColor.withOpacity(0.1),
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryColor
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
                                             child: Icon(
                                               _getCategoryIcon(
                                                   data['category'] ?? 'Foods'),
                                               color: AppTheme.primaryColor,
-                                              size: 24,
+                                              size: 32,
                                             ),
                                           ),
-                                          const SizedBox(width: 12),
+                                          const SizedBox(width: 20),
                                           Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
@@ -830,53 +715,58 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   TextWidget(
                                                     text: data['name'] ??
                                                         'Unnamed',
-                                                    fontSize: 18,
-                                                    fontFamily: 'Medium',
+                                                    fontSize: 20,
+                                                    fontFamily: 'Bold',
                                                     color: Colors.grey[800],
                                                   ),
                                                   if (isLowStock) ...[
-                                                    const SizedBox(width: 8),
+                                                    const SizedBox(width: 12),
                                                     Container(
                                                       padding: const EdgeInsets
                                                           .symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 4),
+                                                          horizontal: 12,
+                                                          vertical: 6),
                                                       decoration: BoxDecoration(
                                                         color: Colors.red[50],
                                                         borderRadius:
                                                             BorderRadius
-                                                                .circular(6),
+                                                                .circular(12),
                                                       ),
                                                       child: TextWidget(
-                                                        text: 'Low Stock',
-                                                        fontSize: 12,
-                                                        fontFamily: 'Regular',
+                                                        text: 'LOW STOCK',
+                                                        fontSize: 14,
+                                                        fontFamily: 'Bold',
                                                         color: Colors.red[600],
                                                       ),
                                                     ),
                                                   ],
                                                 ],
                                               ),
+                                              const SizedBox(height: 6),
                                               TextWidget(
                                                 text:
                                                     'Category: ${data['category'] ?? 'N/A'}',
-                                                fontSize: 14,
-                                                fontFamily: 'Regular',
+                                                fontSize: 16,
+                                                fontFamily: 'Medium',
                                                 color: Colors.grey[600],
                                               ),
+                                              const SizedBox(height: 4),
                                               TextWidget(
                                                 text:
                                                     'Stock: ${data['stock'] ?? 0} units',
-                                                fontSize: 14,
-                                                fontFamily: 'Regular',
-                                                color: Colors.grey[600],
+                                                fontSize: 16,
+                                                fontFamily: 'Medium',
+                                                color: isLowStock
+                                                    ? Colors.red[600]
+                                                    : Colors.grey[600],
                                               ),
+                                              const SizedBox(height: 4),
                                               TextWidget(
                                                 text:
-                                                    'Price: P${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                                fontSize: 14,
-                                                fontFamily: 'Regular',
-                                                color: Colors.grey[600],
+                                                    'Price: ₱${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                                fontSize: 18,
+                                                fontFamily: 'Bold',
+                                                color: AppTheme.primaryColor,
                                               ),
                                             ],
                                           ),
@@ -884,38 +774,56 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       ),
                                       Row(
                                         children: [
-                                          IconButton(
-                                            onPressed: () {
-                                              _showUpdateProductDialog(
-                                                context,
-                                                product.id,
-                                                data['name'] ?? '',
-                                                (data['stock'] as num?)
-                                                        ?.toInt() ??
-                                                    0,
-                                                (data['price'] as num?)
-                                                        ?.toDouble() ??
-                                                    0.0,
-                                                data['category'] ?? '',
-                                              );
-                                            },
-                                            icon: Icon(
-                                              Icons.edit,
-                                              color: AppTheme.primaryColor,
-                                              size: 26,
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryColor
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
                                             ),
-                                            tooltip: 'Update Product',
+                                            child: IconButton(
+                                              onPressed: () {
+                                                _showUpdateProductDialog(
+                                                  context,
+                                                  product.id,
+                                                  data['name'] ?? '',
+                                                  (data['stock'] as num?)
+                                                          ?.toInt() ??
+                                                      0,
+                                                  (data['price'] as num?)
+                                                          ?.toDouble() ??
+                                                      0.0,
+                                                  data['category'] ?? '',
+                                                );
+                                              },
+                                              icon: Icon(
+                                                Icons.edit,
+                                                color: AppTheme.primaryColor,
+                                                size: 32,
+                                              ),
+                                              padding: const EdgeInsets.all(16),
+                                              splashRadius: 30,
+                                            ),
                                           ),
-                                          IconButton(
-                                            onPressed: () {
-                                              _deleteProduct(product.id);
-                                            },
-                                            icon: Icon(
-                                              Icons.delete,
-                                              color: Colors.red[400],
-                                              size: 26,
+                                          const SizedBox(width: 12),
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.red[50],
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
                                             ),
-                                            tooltip: 'Delete Product',
+                                            child: IconButton(
+                                              onPressed: () {
+                                                _deleteProduct(product.id);
+                                              },
+                                              icon: Icon(
+                                                Icons.delete,
+                                                color: Colors.red[400],
+                                                size: 32,
+                                              ),
+                                              padding: const EdgeInsets.all(16),
+                                              splashRadius: 30,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -941,10 +849,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildCategoryButton(String category) {
     final isSelected = _selectedCategory == category;
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
+      padding: const EdgeInsets.only(right: 12.0),
       child: ButtonWidget(
-        width: 150,
-        radius: 12,
+        width: 180,
+        height: 60,
+        radius: 16,
         color: isSelected ? AppTheme.primaryColor : Colors.grey[200]!,
         textColor: isSelected ? Colors.white : Colors.grey[800],
         label: category,
@@ -953,7 +862,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             _selectedCategory = category;
           });
         },
-        fontSize: 14,
+        fontSize: 16,
       ),
     );
   }

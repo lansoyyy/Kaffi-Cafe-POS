@@ -7,6 +7,8 @@ import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/textfield_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/touchable_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,19 +27,53 @@ class _HomeScreenState extends State<HomeScreen>
   final List<Map<String, dynamic>> _cartItems = [];
   double _subtotal = 0.0;
   double _change = 0.0;
+  bool _isLoggedIn = false;
+  String _currentStaffName = '';
 
-  final List<String> categories = ['Coffee', 'Drinks', 'Foods'];
+  final List<String> categories = [
+    'Coffee',
+    'Non-Coffee Drinks',
+    'Pastries',
+    'Sandwiches',
+    'Add-ons'
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: categories.length, vsync: this);
-    _searchController.addListener(() {
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('is_staff_logged_in') ?? false;
+    final staffName = prefs.getString('current_staff_name') ?? '';
+
+    if (!isLoggedIn) {
+      // Redirect to staff login screen if not logged in
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const StaffScreen()),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
       setState(() {
-        _searchQuery = _searchController.text;
+        _isLoggedIn = true;
+        _currentStaffName = staffName;
       });
-    });
-    _amountController.addListener(_calculateChange);
+
+      _tabController = TabController(length: categories.length, vsync: this);
+      _searchController.addListener(() {
+        setState(() {
+          _searchQuery = _searchController.text;
+        });
+      });
+      _amountController.addListener(_calculateChange);
+    }
   }
 
   @override
@@ -196,10 +232,14 @@ class _HomeScreenState extends State<HomeScreen>
     switch (category) {
       case 'Coffee':
         return Icons.local_cafe;
-      case 'Drinks':
-        return Icons.local_drink;
-      case 'Foods':
-        return Icons.fastfood;
+      case 'Non-Coffee Drinks':
+        return Icons.local_bar;
+      case 'Pastries':
+        return Icons.cake;
+      case 'Sandwiches':
+        return Icons.lunch_dining;
+      case 'Add-ons':
+        return Icons.add_shopping_cart;
       default:
         return Icons.fastfood;
     }
@@ -207,6 +247,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!_isLoggedIn) {
+      // Show a loading indicator while checking login status
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor,
@@ -246,6 +293,26 @@ class _HomeScreenState extends State<HomeScreen>
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentStaffName,
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
               ),
             ),
           ],
