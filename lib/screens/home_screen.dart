@@ -9,6 +9,10 @@ import 'package:kaffi_cafe_pos/widgets/textfield_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/touchable_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -179,6 +183,24 @@ class _HomeScreenState extends State<HomeScreen>
       }
       final orderId =
           (await _firestore.collection('orders').get()).docs.length + 1001;
+
+      // Create order data for the dialog
+      final orderData = {
+        'orderId': orderId.toString(),
+        'timestamp': DateTime.now(),
+        'items': _cartItems
+            .map((item) => {
+                  'name': item['name'],
+                  'quantity': item['quantity'],
+                  'price': item['price'],
+                })
+            .toList(),
+        'subtotal': _subtotal,
+        'total': _subtotal,
+        'amountPaid': double.tryParse(_amountController.text) ?? 0.0,
+        'change': _change,
+      };
+
       await _firestore.collection('orders').add({
         'orderId': orderId.toString(),
         'buyer': 'Cashier',
@@ -202,17 +224,9 @@ class _HomeScreenState extends State<HomeScreen>
         _change = 0.0;
         _amountController.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: TextWidget(
-            text: 'Payment processed successfully',
-            fontSize: 14,
-            fontFamily: 'Regular',
-            color: Colors.white,
-          ),
-          backgroundColor: Colors.green[600],
-        ),
-      );
+
+      // Show payment success dialog with order data
+      _showPaymentSuccessDialog(orderData);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -226,6 +240,467 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     }
+  }
+
+  // Generate order PDF
+  Future<pw.Document> _generateOrderPdf(Map<String, dynamic> orderData) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Kaffi Cafe - Order Details',
+                  style: pw.TextStyle(
+                      fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+              pw.Text('Order ID: ${orderData['orderId']}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.Text(
+                  'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.SizedBox(height: 20),
+              pw.Text('Items:',
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              ...orderData['items'].map<pw.Widget>((item) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          flex: 3,
+                          child: pw.Text('${item['name']}',
+                              style: const pw.TextStyle(fontSize: 12)),
+                        ),
+                        pw.Expanded(
+                          flex: 1,
+                          child: pw.Text('x${item['quantity']}',
+                              style: const pw.TextStyle(fontSize: 12)),
+                        ),
+                        pw.Expanded(
+                          flex: 2,
+                          child: pw.Text(
+                              'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                              style: const pw.TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  )),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 14)),
+                  pw.Text('P${orderData['subtotal'].toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 14)),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:',
+                      style: pw.TextStyle(
+                          fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('P${orderData['total'].toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                          fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  // Generate receipt PDF
+  Future<pw.Document> _generateReceiptPdf(
+      Map<String, dynamic> orderData) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text('Kaffi Cafe',
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Official Receipt',
+                  style: pw.TextStyle(
+                      fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              pw.Text('Order #${orderData['orderId']}',
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                  'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 15),
+              pw.Divider(),
+              ...orderData['items'].map<pw.Widget>((item) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text('${item['name']} x${item['quantity']}',
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Text(
+                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                            style: const pw.TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  )),
+              pw.Divider(),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('P${orderData['total'].toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Amount Paid:',
+                      style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('P${orderData['amountPaid'].toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 10)),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Change:', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('P${orderData['change'].toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 10)),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text('Thank you for your purchase!',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Please come again.',
+                  style: const pw.TextStyle(fontSize: 10)),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  // Show payment success dialog
+  void _showPaymentSuccessDialog(Map<String, dynamic> orderData) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Payment Successful',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${orderData['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text:
+                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text: 'Items:',
+                      fontSize: 16,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: orderData['items'].map<Widget>((item) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: item['name'],
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                  TextWidget(
+                                    text: 'x${item['quantity']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[700],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextWidget(
+                                    text:
+                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[800],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextWidget(
+                                text: 'Subtotal:',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                              TextWidget(
+                                text:
+                                    'P${orderData['subtotal'].toStringAsFixed(2)}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[800],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextWidget(
+                                text: 'Total:',
+                                fontSize: 16,
+                                fontFamily: 'Bold',
+                                color: Colors.grey[800],
+                              ),
+                              TextWidget(
+                                text:
+                                    'P${orderData['total'].toStringAsFixed(2)}',
+                                fontSize: 16,
+                                fontFamily: 'Bold',
+                                color: Colors.grey[800],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextWidget(
+                                text: 'Amount Paid:',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                              TextWidget(
+                                text:
+                                    'P${orderData['amountPaid'].toStringAsFixed(2)}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[800],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextWidget(
+                                text: 'Change:',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                              TextWidget(
+                                text:
+                                    'P${orderData['change'].toStringAsFixed(2)}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: orderData['change'] >= 0
+                                    ? Colors.green[600]!
+                                    : Colors.red[600]!,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.grey[300]!,
+                      textColor: AppTheme.primaryColor,
+                      label: 'Print Order',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateOrderPdf(orderData);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing order: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: AppTheme.primaryColor,
+                      textColor: Colors.white,
+                      label: 'Print Receipt',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateReceiptPdf(orderData);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing receipt: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.red[600]!,
+                      textColor: Colors.white,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   IconData _getCategoryIcon(String category) {
@@ -259,6 +734,51 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
+        actions: [
+          StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('orders')
+                  .where('status', isEqualTo: 'Pending')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextWidget(
+                      text: 'Error: ${snapshot.error}',
+                      fontSize: 16,
+                      fontFamily: 'Regular',
+                      color: Colors.red[600],
+                    ),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final orders = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final orderId =
+                      data['orderId']?.toString().toLowerCase() ?? '';
+                  final buyer = data['buyer']?.toString().toLowerCase() ?? '';
+                  return orderId.contains(_searchQuery) ||
+                      buyer.contains(_searchQuery);
+                }).toList();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Badge(
+                    label: TextWidget(
+                      text: orders.length.toString(),
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
+                    child: Icon(
+                      Icons.notifications,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                );
+              }),
+        ],
         title: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [

@@ -5,6 +5,10 @@ import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({super.key});
@@ -60,7 +64,8 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -74,7 +79,8 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -89,7 +95,8 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -104,7 +111,8 @@ class _OrderScreenState extends State<OrderScreen> {
                       borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
               ),
@@ -259,36 +267,437 @@ class _OrderScreenState extends State<OrderScreen> {
     );
   }
 
+  // Generate order PDF
+  Future<pw.Document> _generateOrderPdf(Map<String, dynamic> orderData) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Kaffi Cafe - Order Details',
+                  style: pw.TextStyle(
+                      fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+              pw.Text('Order ID: ${orderData['orderId']}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.Text(
+                  'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((orderData['timestamp'] as Timestamp).toDate())}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.SizedBox(height: 20),
+              pw.Text('Buyer: ${orderData['buyer']}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.SizedBox(height: 20),
+              pw.Text('Items:',
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              ...(orderData['items'] as List<dynamic>)
+                  .map<pw.Widget>((item) => pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                        child: pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Expanded(
+                              flex: 3,
+                              child: pw.Text('${item['name']}',
+                                  style: const pw.TextStyle(fontSize: 12)),
+                            ),
+                            pw.Expanded(
+                              flex: 1,
+                              child: pw.Text('x${item['quantity']}',
+                                  style: const pw.TextStyle(fontSize: 12)),
+                            ),
+                            pw.Expanded(
+                              flex: 2,
+                              child: pw.Text(
+                                  'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                  style: const pw.TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      )),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text('Total:',
+                      style: pw.TextStyle(
+                          fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('P${orderData['total'].toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                          fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  // Generate receipt PDF
+  Future<pw.Document> _generateReceiptPdf(
+      Map<String, dynamic> orderData) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text('Kaffi Cafe',
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Official Receipt',
+                  style: pw.TextStyle(
+                      fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              pw.Text('Order #${orderData['orderId']}',
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                  'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((orderData['timestamp'] as Timestamp).toDate())}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 15),
+              pw.Text('Buyer: ${orderData['buyer']}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 15),
+              pw.Divider(),
+              ...(orderData['items'] as List<dynamic>)
+                  .map<pw.Widget>((item) => pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Expanded(
+                              child: pw.Text(
+                                  '${item['name']} x${item['quantity']}',
+                                  style: const pw.TextStyle(fontSize: 10)),
+                            ),
+                            pw.Text(
+                                'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                style: const pw.TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                      )),
+              pw.Divider(),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('P${orderData['total'].toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text('Thank you for your purchase!',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Please come again.',
+                  style: const pw.TextStyle(fontSize: 10)),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  // Show payment success dialog
+  void _showPaymentSuccessDialog(Map<String, dynamic> orderData) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Order Processed',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${orderData['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Buyer: ${orderData['buyer']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text:
+                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((orderData['timestamp'] as Timestamp).toDate())}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text: 'Items:',
+                      fontSize: 16,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: (orderData['items'] as List<dynamic>)
+                              .map<Widget>((item) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: item['name'],
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                  TextWidget(
+                                    text: 'x${item['quantity']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[700],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextWidget(
+                                    text:
+                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[800],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextWidget(
+                            text: 'Total:',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                          TextWidget(
+                            text: 'P${orderData['total'].toStringAsFixed(2)}',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.grey[300]!,
+                      textColor: AppTheme.primaryColor,
+                      label: 'Print Order',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateOrderPdf(orderData);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing order: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: AppTheme.primaryColor,
+                      textColor: Colors.white,
+                      label: 'Print Receipt',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateReceiptPdf(orderData);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing receipt: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.red[600]!,
+                      textColor: Colors.white,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Update order status
   Future<void> _updateOrderStatus(String docId, String status) async {
     try {
+      final orderDoc = await _firestore.collection('orders').doc(docId).get();
+      final orderData = orderDoc.data() as Map<String, dynamic>;
+
       await _firestore.collection('orders').doc(docId).update({
         'status': status,
         'timestamp': FieldValue.serverTimestamp(),
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: TextWidget(
-            text: 'Order $status successfully',
-            fontSize: 14,
-            fontFamily: 'Regular',
-            color: Colors.white,
+
+      // Show payment success dialog when order is accepted (Preparing)
+      if (status == 'Accepted' && context.mounted) {
+        _showPaymentSuccessDialog(orderData);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: TextWidget(
+              text:
+                  'Order status updated to ${_mapStatusToUI(status)} successfully',
+              fontSize: 14,
+              fontFamily: 'Regular',
+              color: Colors.white,
+            ),
+            backgroundColor: AppTheme.primaryColor,
           ),
-          backgroundColor: AppTheme.primaryColor,
-        ),
-      );
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: TextWidget(
-            text: 'Error updating order: $e',
-            fontSize: 14,
-            fontFamily: 'Regular',
-            color: Colors.white,
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: TextWidget(
+              text: 'Error updating order: $e',
+              fontSize: 14,
+              fontFamily: 'Regular',
+              color: Colors.white,
+            ),
+            backgroundColor: Colors.red[600],
           ),
-          backgroundColor: Colors.red[600],
-        ),
-      );
+        );
+      }
     }
   }
 
@@ -320,6 +729,57 @@ class _OrderScreenState extends State<OrderScreen> {
         ),
       );
     }
+  }
+
+  // Map database status to UI status
+  String _mapStatusToUI(String dbStatus) {
+    switch (dbStatus) {
+      case 'Pending':
+        return 'On Hold';
+      case 'Accepted':
+        return 'Preparing';
+      case 'Ready to Pickup':
+        return 'Ready to Pickup';
+      case 'Completed':
+        return 'Completed';
+      default:
+        return dbStatus;
+    }
+  }
+
+  // Get status color
+  Color _getStatusColor(String uiStatus) {
+    switch (uiStatus) {
+      case 'On Hold':
+        return Colors.orange; // Orange for On Hold
+      case 'Preparing':
+        return Colors.blue; // Blue for Preparing
+      case 'Ready to Pickup':
+        return Colors.green; // Green for Ready to Pickup
+      case 'Completed':
+        return Colors.grey; // Gray for Completed
+      default:
+        return Colors.orange;
+    }
+  }
+
+  // Advance order to next status
+  Future<void> _advanceOrderStatus(String docId, String currentStatus) async {
+    String newStatus;
+    switch (currentStatus) {
+      case 'Pending': // On Hold
+        newStatus = 'Accepted'; // Preparing
+        break;
+      case 'Accepted': // Preparing
+        newStatus = 'Ready to Pickup';
+        break;
+      case 'Ready to Pickup':
+        newStatus = 'Completed';
+        break;
+      default:
+        return; // Don't advance for unknown statuses
+    }
+    await _updateOrderStatus(docId, newStatus);
   }
 
   @override
@@ -403,201 +863,366 @@ class _OrderScreenState extends State<OrderScreen> {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final orders = snapshot.data!.docs.where((doc) {
+
+            // Filter orders and count by status
+            final allOrders = snapshot.data!.docs;
+            final pendingOrders = allOrders.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status'] ?? 'Pending';
+              return status == 'Pending';
+            }).toList();
+
+            final acceptedOrders = allOrders.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status'] ?? 'Pending';
+              return status == 'Accepted';
+            }).toList();
+
+            final readyOrders = allOrders.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status'] ?? 'Pending';
+              return status == 'Ready to Pickup';
+            }).toList();
+
+            final completedOrders = allOrders.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status'] ?? 'Pending';
+              return status == 'Completed';
+            }).toList();
+
+            final filteredOrders = allOrders.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final orderId = data['orderId']?.toString().toLowerCase() ?? '';
               final buyer = data['buyer']?.toString().toLowerCase() ?? '';
+              final status = data['status'] ?? 'Pending';
+              // Filter out completed orders from display
+              if (status == 'Completed') return false;
               return orderId.contains(_searchQuery) ||
                   buyer.contains(_searchQuery);
             }).toList();
-            return ListView.builder(
-                itemCount: orders.length,
-                itemBuilder: (context, index) {
-                  final order = orders[index];
-                  final data = order.data() as Map<String, dynamic>;
-                  final items = (data['items'] as List<dynamic>?)
-                          ?.cast<Map<String, dynamic>>() ??
-                      [];
-                  final status = data['status'] ?? 'Pending';
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+
+            return Column(
+              children: [
+                // Status Counts Section
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                TextWidget(
-                                  text: 'Order #${data['orderId'] ?? 'N/A'}',
-                                  fontSize: 18,
-                                  fontFamily: 'Bold',
-                                  color: Colors.grey[800],
-                                ),
-                                TextWidget(
-                                  text: status,
-                                  fontSize: 14,
-                                  fontFamily: 'Medium',
-                                  color: status == 'Accepted'
-                                      ? Colors.green[600]
-                                      : status == 'Declined'
-                                          ? Colors.red[600]
-                                          : Colors.orange[600],
-                                ),
-                              ],
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatusCountCard(
+                          'On Hold', pendingOrders.length, Colors.orange),
+                      _buildStatusCountCard(
+                          'Preparing', acceptedOrders.length, Colors.blue),
+                      _buildStatusCountCard(
+                          'Ready', readyOrders.length, Colors.green),
+                      _buildStatusCountCard(
+                          'Completed', completedOrders.length, Colors.grey),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Orders List
+                Expanded(
+                  child: ListView.builder(
+                      itemCount: filteredOrders.length,
+                      itemBuilder: (context, index) {
+                        final order = filteredOrders[index];
+                        final data = order.data() as Map<String, dynamic>;
+                        final items = (data['items'] as List<dynamic>?)
+                                ?.cast<Map<String, dynamic>>() ??
+                            [];
+                        final status = data['status'] ?? 'Pending';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(height: 8),
-                            TextWidget(
-                              text: 'Buyer: ${data['buyer'] ?? 'Unknown'}',
-                              fontSize: 16,
-                              fontFamily: 'Medium',
-                              color: Colors.grey[700],
-                            ),
-                            const SizedBox(height: 12),
-                            const Divider(color: Colors.grey, thickness: 0.5),
-                            const SizedBox(height: 12),
-                            // Order Items
-                            Column(
-                              children: items.map((item) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: Row(
+                            child: Container(
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
+                                      TextWidget(
+                                        text:
+                                            'Order #${data['orderId'] ?? 'N/A'}',
+                                        fontSize: 18,
+                                        fontFamily: 'Bold',
+                                        color: Colors.grey[800],
+                                      ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: Colors.blue[100],
+                                          color: _getStatusColor(
+                                                  _mapStatusToUI(status))
+                                              .withOpacity(0.2),
                                           borderRadius:
-                                              BorderRadius.circular(8),
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: _getStatusColor(
+                                                _mapStatusToUI(status)),
+                                            width: 1,
+                                          ),
                                         ),
                                         child: TextWidget(
-                                          text: 'x${item['quantity'] ?? 1}',
+                                          text: _mapStatusToUI(status),
                                           fontSize: 14,
-                                          fontFamily: 'Bold',
-                                          color: Colors.blue[800],
+                                          fontFamily: 'Medium',
+                                          color: _getStatusColor(
+                                              _mapStatusToUI(status)),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: TextWidget(
-                                          text: item['name'] ?? 'Unknown Item',
-                                          fontSize: 16,
-                                          fontFamily: 'Regular',
-                                          color: Colors.grey[800],
-                                        ),
-                                      ),
-                                      TextWidget(
-                                        text:
-                                            'P${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[600],
                                       ),
                                     ],
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 12),
-                            const Divider(color: Colors.grey, thickness: 0.5),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                TextWidget(
-                                  text: 'Total',
-                                  fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: Colors.grey[800],
-                                ),
-                                TextWidget(
-                                  text:
-                                      'P${(data['total'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                  fontSize: 16,
-                                  fontFamily: 'Bold',
-                                  color: Colors.grey[800],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                IconButton(
-                                  onPressed: () => _deleteOrder(order.id),
-                                  icon: Icon(
-                                    Icons.delete,
-                                    color: Colors.red[400],
-                                    size: 26,
-                                  ),
-                                  tooltip: 'Delete Order',
-                                ),
-                                const SizedBox(width: 12),
-                                ElevatedButton(
-                                  onPressed: status == 'Pending'
-                                      ? () => _updateOrderStatus(
-                                          order.id, 'Declined')
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red[400],
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(120, 48),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 2,
-                                  ),
-                                  child: TextWidget(
-                                    text: 'Decline',
+                                  const SizedBox(height: 8),
+                                  TextWidget(
+                                    text:
+                                        'Buyer: ${data['buyer'] ?? 'Unknown'}',
                                     fontSize: 16,
                                     fontFamily: 'Medium',
-                                    color: Colors.white,
+                                    color: Colors.grey[700],
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                ElevatedButton(
-                                  onPressed: status == 'Pending'
-                                      ? () => _updateOrderStatus(
-                                          order.id, 'Accepted')
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green[600],
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(120, 48),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 2,
+                                  const SizedBox(height: 12),
+                                  const Divider(
+                                      color: Colors.grey, thickness: 0.5),
+                                  const SizedBox(height: 12),
+                                  // Order Items
+                                  Column(
+                                    children: items.map((item) {
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8.0),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[100],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: TextWidget(
+                                                text:
+                                                    'x${item['quantity'] ?? 1}',
+                                                fontSize: 14,
+                                                fontFamily: 'Bold',
+                                                color: Colors.blue[800],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: TextWidget(
+                                                text: item['name'] ??
+                                                    'Unknown Item',
+                                                fontSize: 16,
+                                                fontFamily: 'Regular',
+                                                color: Colors.grey[800],
+                                              ),
+                                            ),
+                                            TextWidget(
+                                              text:
+                                                  'P${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                              fontSize: 14,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[600],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
                                   ),
-                                  child: TextWidget(
-                                    text: 'Accept',
-                                    fontSize: 16,
-                                    fontFamily: 'Medium',
-                                    color: Colors.white,
+                                  const SizedBox(height: 12),
+                                  const Divider(
+                                      color: Colors.grey, thickness: 0.5),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      TextWidget(
+                                        text: 'Total',
+                                        fontSize: 16,
+                                        fontFamily: 'Bold',
+                                        color: Colors.grey[800],
+                                      ),
+                                      TextWidget(
+                                        text:
+                                            'P${(data['total'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                        fontSize: 16,
+                                        fontFamily: 'Bold',
+                                        color: Colors.grey[800],
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _deleteOrder(order.id),
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color: Colors.red[400],
+                                          size: 26,
+                                        ),
+                                        tooltip: 'Delete Order',
+                                      ),
+                                      const SizedBox(width: 12),
+                                      if (status == 'Pending') ...[
+                                        ElevatedButton(
+                                          onPressed: () => _updateOrderStatus(
+                                              order.id, 'Declined'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red[400],
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(120, 48),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            elevation: 2,
+                                          ),
+                                          child: TextWidget(
+                                            text: 'Decline',
+                                            fontSize: 16,
+                                            fontFamily: 'Medium',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        ElevatedButton(
+                                          onPressed: () => _advanceOrderStatus(
+                                              order.id, status),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green[600],
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(120, 48),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            elevation: 2,
+                                          ),
+                                          child: TextWidget(
+                                            text: 'Accept',
+                                            fontSize: 16,
+                                            fontFamily: 'Medium',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ] else if (status == 'Accepted') ...[
+                                        ElevatedButton(
+                                          onPressed: () => _advanceOrderStatus(
+                                              order.id, status),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue[600],
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(180, 48),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            elevation: 2,
+                                          ),
+                                          child: TextWidget(
+                                            text: 'Mark as Ready',
+                                            fontSize: 16,
+                                            fontFamily: 'Medium',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ] else if (status ==
+                                          'Ready to Pickup') ...[
+                                        ElevatedButton(
+                                          onPressed: () => _advanceOrderStatus(
+                                              order.id, status),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green[600],
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(180, 48),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            elevation: 2,
+                                          ),
+                                          child: TextWidget(
+                                            text: 'Complete Order',
+                                            fontSize: 16,
+                                            fontFamily: 'Medium',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                });
+                          ),
+                        );
+                      }),
+                ),
+              ],
+            );
           },
         ),
       ),
+    );
+  }
+
+  // Build status count card widget
+  Widget _buildStatusCountCard(String title, int count, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextWidget(
+          text: title,
+          fontSize: 12,
+          fontFamily: 'Medium',
+          color: Colors.grey[700],
+        ),
+      ],
     );
   }
 
