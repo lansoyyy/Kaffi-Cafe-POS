@@ -8,12 +8,14 @@ import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:csv/csv.dart';
 import 'package:universal_html/html.dart' as html;
+
+// Added: Import for date picker widget
+import 'package:kaffi_cafe_pos/widgets/date_picker_widget.dart';
 
 class TransactionScreen extends StatefulWidget {
   const TransactionScreen({super.key});
@@ -24,13 +26,12 @@ class TransactionScreen extends StatefulWidget {
 
 class _TransactionScreenState extends State<TransactionScreen> {
   DateTime? _selectedDay;
-  DateTime _focusedDay = DateTime.now();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay;
+    _selectedDay = DateTime.now();
   }
 
   Future<void> _deleteTransaction(String orderId, String itemName) async {
@@ -59,6 +60,181 @@ class _TransactionScreenState extends State<TransactionScreen> {
           backgroundColor: festiveRed,
         ),
       );
+    }
+  }
+
+  // Added: Method to show transaction details
+  void _showTransactionDetails(Map<String, dynamic> transactionData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (BuildContext context, ScrollController scrollController) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: TextWidget(
+                        text: 'Transaction Details',
+                        fontSize: 20,
+                        fontFamily: 'Bold',
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildDetailRow('Order ID', transactionData['orderId']),
+                    _buildDetailRow(
+                        'Customer', transactionData['buyer'] ?? 'N/A'),
+                    _buildDetailRow(
+                        'Date',
+                        DateFormat('MMM dd, yyyy HH:mm')
+                            .format(transactionData['timestamp'].toDate())),
+                    const SizedBox(height: 20),
+                    TextWidget(
+                      text: 'Items',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    ...transactionData['items'].map<Widget>((item) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: AppTheme.primaryColor.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: TextWidget(
+                                text: item['name'],
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            TextWidget(
+                              text: 'x${item['quantity']}',
+                              fontSize: 14,
+                              fontFamily: 'Regular',
+                              color: Colors.grey[800],
+                            ),
+                            TextWidget(
+                              text:
+                                  '₱${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                              fontSize: 14,
+                              fontFamily: 'Regular',
+                              color: Colors.grey[800],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextWidget(
+                          text: 'Total Amount:',
+                          fontSize: 16,
+                          fontFamily: 'Bold',
+                          color: AppTheme.primaryColor,
+                        ),
+                        TextWidget(
+                          text:
+                              '₱${transactionData['total'].toStringAsFixed(2)}',
+                          fontSize: 16,
+                          fontFamily: 'Bold',
+                          color: AppTheme.primaryColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: ButtonWidget(
+                        width: 200,
+                        radius: 8,
+                        color: festiveRed,
+                        textColor: Colors.white,
+                        label: 'Delete Transaction',
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteTransaction(transactionData['orderId'],
+                              transactionData['items'][0]['name']);
+                        },
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Added: Helper method to build detail rows
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 1,
+            child: TextWidget(
+              text: '$label:',
+              fontSize: 14,
+              fontFamily: 'Bold',
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: TextWidget(
+              text: value,
+              fontSize: 14,
+              fontFamily: 'Regular',
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Added: Method to show date picker
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await datePickerWidget(context, _selectedDay!);
+    if (picked != null && picked != _selectedDay) {
+      setState(() {
+        _selectedDay = picked;
+      });
     }
   }
 
@@ -222,35 +398,95 @@ class _TransactionScreenState extends State<TransactionScreen> {
               child: Card(
                 color: Colors.white,
                 elevation: 3,
-                child: TableCalendar(
-                  firstDay: DateTime.utc(2010, 10, 16),
-                  lastDay: DateTime.utc(2050, 3, 14),
-                  focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                  calendarStyle: const CalendarStyle(
-                    cellMargin: EdgeInsets.zero,
-                    cellPadding: EdgeInsets.zero,
-                    tablePadding: EdgeInsets.zero,
-                    outsideDaysVisible: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        text: 'Select Date',
+                        fontSize: 18,
+                        fontFamily: 'Bold',
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: ButtonWidget(
+                          width: 200,
+                          radius: 8,
+                          color: AppTheme.primaryColor,
+                          textColor: Colors.white,
+                          label:
+                              DateFormat('MMM dd, yyyy').format(_selectedDay!),
+                          onPressed: () => _selectDate(context),
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextWidget(
+                        text: 'Transaction Summary',
+                        fontSize: 16,
+                        fontFamily: 'Bold',
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(height: 10),
+                      StreamBuilder<QuerySnapshot>(
+                        stream: _firestore
+                            .collection('orders')
+                            .where('timestamp',
+                                isGreaterThanOrEqualTo: Timestamp.fromDate(
+                                    DateTime(
+                                        _selectedDay!.year,
+                                        _selectedDay!.month,
+                                        _selectedDay!.day)))
+                            .where('timestamp',
+                                isLessThanOrEqualTo: Timestamp.fromDate(
+                                    DateTime(
+                                        _selectedDay!.year,
+                                        _selectedDay!.month,
+                                        _selectedDay!.day + 1)))
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: TextWidget(
+                                text: 'Error: ${snapshot.error}',
+                                fontSize: 16,
+                                fontFamily: 'Regular',
+                                color: festiveRed,
+                              ),
+                            );
+                          }
+                          if (!snapshot.hasData) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
+                          final orders = snapshot.data!.docs;
+                          int totalTransactions = orders.length;
+                          double totalAmount = 0;
+                          int totalItems = 0;
+
+                          for (var order in orders) {
+                            final data = order.data() as Map<String, dynamic>;
+                            totalAmount += data['totalAmount'] ?? 0;
+                            final items = data['items'] as List<dynamic>;
+                            totalItems += items.length;
+                          }
+
+                          return Column(
+                            children: [
+                              _buildSummaryRow('Total Transactions',
+                                  totalTransactions.toString()),
+                              _buildSummaryRow(
+                                  'Total Items', totalItems.toString()),
+                              _buildSummaryRow('Total Amount',
+                                  '₱${totalAmount.toStringAsFixed(2)}'),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    titleTextStyle:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    leftChevronMargin: EdgeInsets.zero,
-                    rightChevronMargin: EdgeInsets.zero,
-                    headerPadding: EdgeInsets.symmetric(vertical: 8.0),
-                  ),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDay = selectedDay;
-                      _focusedDay = focusedDay;
-                    });
-                  },
-                  availableGestures: AvailableGestures.horizontalSwipe,
-                  calendarFormat: CalendarFormat.month,
-                  rowHeight: 40,
                 ),
               ),
             ),
@@ -357,6 +593,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                     'price': item['price'],
                                     'orderId': order.id,
                                     'category': category,
+                                    // Added: Include full transaction data for details
+                                    'transactionData': data,
                                   });
                                 }
                               }
@@ -380,7 +618,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                       const SizedBox(height: 12),
                                       Table(
                                         border: TableBorder.all(
-                                          color: AppTheme.primaryColor.withOpacity(0.2),
+                                          color: AppTheme.primaryColor
+                                              .withOpacity(0.2),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),
@@ -392,12 +631,16 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                         },
                                         children: [
                                           _buildTableHeader(),
-                                          ...items.map((item) => _buildTableRow(
-                                                item['name'],
-                                                item['quantity'],
-                                                item['price'],
-                                                item['orderId'],
-                                              )),
+                                          // Modified: Make table rows clickable
+                                          ...items.map(
+                                              (item) => _buildClickableTableRow(
+                                                    item['name'],
+                                                    item['quantity'],
+                                                    item['price'],
+                                                    item['orderId'],
+                                                    item[
+                                                        'transactionData'], // Added: Pass transaction data
+                                                  )),
                                         ],
                                       ),
                                       const SizedBox(height: 24),
@@ -414,6 +657,30 @@ class _TransactionScreenState extends State<TransactionScreen> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Added: Helper method to build summary rows
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          TextWidget(
+            text: label,
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.grey[700],
+          ),
+          TextWidget(
+            text: value,
+            fontSize: 14,
+            fontFamily: 'Bold',
+            color: AppTheme.primaryColor,
           ),
         ],
       ),
@@ -469,17 +736,22 @@ class _TransactionScreenState extends State<TransactionScreen> {
     );
   }
 
-  TableRow _buildTableRow(
-      String item, int quantity, double price, String orderId) {
+  // Modified: Make table rows clickable and pass transaction data
+  TableRow _buildClickableTableRow(String item, int quantity, double price,
+      String orderId, Map<String, dynamic> transactionData) {
     return TableRow(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TextWidget(
-            text: item,
-            fontSize: 14,
-            fontFamily: 'Regular',
-            color: Colors.grey[800],
+        // Modified: Wrap item name in GestureDetector to make it clickable
+        GestureDetector(
+          onTap: () => _showTransactionDetails(transactionData),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextWidget(
+              text: item,
+              fontSize: 14,
+              fontFamily: 'Regular',
+              color: Colors.grey[800],
+            ),
           ),
         ),
         Padding(
@@ -495,7 +767,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextWidget(
-            text: '₱${price.toStringAsFixed(2)}',
+            text: '₱${(price * quantity).toStringAsFixed(2)}',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.grey[800],
