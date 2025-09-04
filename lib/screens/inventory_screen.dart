@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
@@ -18,9 +21,12 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   String _selectedCategory = 'All';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _picker = ImagePicker();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoggedIn = false;
+  File? _selectedImage;
 
   final List<String> _categories = [
     'All',
@@ -204,202 +210,312 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  void _showUpdateProductDialog(BuildContext context, String? docId,
-      String productName, int stock, double price, String category) {
+  void _showUpdateProductDialog(
+      BuildContext context,
+      String? docId,
+      String productName,
+      int stock,
+      double price,
+      String category,
+      String imageUrl) {
     final nameController = TextEditingController(text: productName);
     final stockController = TextEditingController(text: stock.toString());
     final priceController = TextEditingController(text: price.toString());
     String selectedCategory = category.isEmpty ? 'Coffee' : category;
+    String currentImageUrl = imageUrl;
+    File? newImage;
+
+    // Function to upload image to Firebase Storage
+    Future<String?> _uploadImage(String productId) async {
+      if (newImage == null) return currentImageUrl;
+
+      try {
+        final ref =
+            _storage.ref().child('product_images').child('$productId.jpg');
+        await ref.putFile(newImage!);
+        final url = await ref.getDownloadURL();
+        return url;
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: TextWidget(
+              text: 'Error uploading image: $e',
+              fontSize: 14,
+              fontFamily: 'Regular',
+              color: Colors.white,
+            ),
+            backgroundColor: Colors.red[600],
+          ),
+        );
+        return null;
+      }
+    }
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.white,
-        title: TextWidget(
-          text: docId == null ? 'Add Product' : 'Update Product',
-          fontSize: 18,
-          fontFamily: 'Bold',
-          color: Colors.grey[800],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Product Name',
-                  labelStyle: TextStyle(color: Colors.grey[600]),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
+      builder: (context) => StatefulBuilder(builder: (context, setState) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: Colors.white,
+          title: TextWidget(
+            text: docId == null ? 'Add Product' : 'Update Product',
+            fontSize: 18,
+            fontFamily: 'Bold',
+            color: Colors.grey[800],
+          ),
+          content: StatefulBuilder(builder: (context, setState) {
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Image picker section
+                  GestureDetector(
+                    onTap: () async {
+                      final XFile? pickedFile = await _picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 50,
+                      );
+
+                      if (pickedFile != null) {
+                        setState(() {
+                          newImage = File(pickedFile.path);
+                        });
+                      }
+                    },
+                    child: Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withOpacity(0.5),
+                          width: 2,
+                        ),
+                      ),
+                      child: newImage != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                newImage!,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : currentImageUrl.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    currentImageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.image_not_supported,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      );
+                                    },
+                                  ),
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_a_photo,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text('Tap to add image'),
+                                  ],
+                                ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Product Name',
+                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                    items: [
+                      'Coffee',
+                      'Non-Coffee Drinks',
+                      'Pastries',
+                      'Sandwiches',
+                      'Add-ons'
+                    ].map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: TextWidget(
+                          text: category,
+                          fontSize: 14,
+                          fontFamily: 'Regular',
+                          color: Colors.black87,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      selectedCategory = value!;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: stockController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Stock (units)',
+                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Price (P)',
+                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedCategory,
-                decoration: InputDecoration(
-                  labelText: 'Category',
-                  labelStyle: TextStyle(color: Colors.grey[600]),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-                items: [
-                  'Coffee',
-                  'Non-Coffee Drinks',
-                  'Pastries',
-                  'Sandwiches',
-                  'Add-ons'
-                ].map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: TextWidget(
-                      text: category,
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.black87,
+            );
+          }),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: TextWidget(
+                text: 'Cancel',
+                fontSize: 14,
+                fontFamily: 'Medium',
+                color: Colors.grey[600],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isEmpty ||
+                    stockController.text.isEmpty ||
+                    priceController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: TextWidget(
+                        text: 'Please fill in all fields',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.white,
+                      ),
+                      backgroundColor: Colors.red[600],
                     ),
                   );
-                }).toList(),
-                onChanged: (value) {
-                  selectedCategory = value!;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: stockController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Stock (units)',
-                  labelStyle: TextStyle(color: Colors.grey[600]),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Price (P)',
-                  labelStyle: TextStyle(color: Colors.grey[600]),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'Cancel',
-              fontSize: 14,
-              fontFamily: 'Medium',
-              color: Colors.grey[600],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty ||
-                  stockController.text.isEmpty ||
-                  priceController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Please fill in all fields',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.white,
-                    ),
-                    backgroundColor: Colors.red[600],
-                  ),
-                );
-                return;
-              }
-              final stock = int.tryParse(stockController.text);
-              final price = double.tryParse(priceController.text);
-              if (stock == null || stock < 0 || price == null || price < 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Invalid stock or price',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.white,
-                    ),
-                    backgroundColor: Colors.red[600],
-                  ),
-                );
-                return;
-              }
-              try {
-                final data = {
-                  'name': nameController.text,
-                  'searchName': nameController.text.toLowerCase(),
-                  'stock': stock,
-                  'price': price,
-                  'category': selectedCategory,
-                  'timestamp': FieldValue.serverTimestamp(),
-                };
-                if (docId == null) {
-                  await _firestore.collection('products').add(data);
-                } else {
-                  await _firestore
-                      .collection('products')
-                      .doc(docId)
-                      .update(data);
+                  return;
                 }
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Error: $e',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.white,
+                final stock = int.tryParse(stockController.text);
+                final price = double.tryParse(priceController.text);
+                if (stock == null || stock < 0 || price == null || price < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: TextWidget(
+                        text: 'Invalid stock or price',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.white,
+                      ),
+                      backgroundColor: Colors.red[600],
                     ),
-                    backgroundColor: Colors.red[600],
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  );
+                  return;
+                }
+                try {
+                  final data = {
+                    'name': nameController.text,
+                    'searchName': nameController.text.toLowerCase(),
+                    'stock': stock,
+                    'price': price,
+                    'category': selectedCategory,
+                    'image': '', // Initialize with empty string
+                    'timestamp': FieldValue.serverTimestamp(),
+                  };
+
+                  String? productId;
+                  if (docId == null) {
+                    // Adding new product
+                    final docRef =
+                        await _firestore.collection('products').add(data);
+                    productId = docRef.id;
+                  } else {
+                    // Updating existing product
+                    await _firestore
+                        .collection('products')
+                        .doc(docId)
+                        .update(data);
+                    productId = docId;
+                  }
+
+                  // Upload image if selected
+                  if (newImage != null && productId != null) {
+                    final imageUrl = await _uploadImage(productId);
+                    if (imageUrl != null) {
+                      await _firestore
+                          .collection('products')
+                          .doc(productId)
+                          .update({'image': imageUrl});
+                    }
+                  }
+
+                  Navigator.pop(context);
+                } catch (e) {}
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: TextWidget(
+                text: docId == null ? 'Add' : 'Update',
+                fontSize: 14,
+                fontFamily: 'Medium',
+                color: Colors.white,
+              ),
             ),
-            child: TextWidget(
-              text: docId == null ? 'Add' : 'Update',
-              fontSize: 14,
-              fontFamily: 'Medium',
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      }),
     );
   }
 
@@ -562,7 +678,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         label: 'Add Product',
                         onPressed: () {
                           _showUpdateProductDialog(
-                              context, null, '', 0, 0.0, '');
+                              context, null, '', 0, 0.0, '', '');
                         },
                         fontSize: 18,
                         width: 180,
@@ -691,19 +807,44 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       Row(
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.all(16),
+                                            width: 80,
+                                            height: 80,
                                             decoration: BoxDecoration(
                                               color: AppTheme.primaryColor
                                                   .withOpacity(0.1),
                                               borderRadius:
                                                   BorderRadius.circular(16),
                                             ),
-                                            child: Icon(
-                                              _getCategoryIcon(
-                                                  data['category'] ?? 'Foods'),
-                                              color: AppTheme.primaryColor,
-                                              size: 32,
-                                            ),
+                                            child: data['image'] != null &&
+                                                    data['image'] != ''
+                                                ? ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            16),
+                                                    child: Image.network(
+                                                      data['image'],
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
+                                                        return Icon(
+                                                          _getCategoryIcon(data[
+                                                                  'category'] ??
+                                                              'Foods'),
+                                                          color: AppTheme
+                                                              .primaryColor,
+                                                          size: 32,
+                                                        );
+                                                      },
+                                                    ),
+                                                  )
+                                                : Icon(
+                                                    _getCategoryIcon(
+                                                        data['category'] ??
+                                                            'Foods'),
+                                                    color:
+                                                        AppTheme.primaryColor,
+                                                    size: 32,
+                                                  ),
                                           ),
                                           const SizedBox(width: 20),
                                           Column(
@@ -794,6 +935,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                           ?.toDouble() ??
                                                       0.0,
                                                   data['category'] ?? '',
+                                                  data['image'] ?? '',
                                                 );
                                               },
                                               icon: Icon(

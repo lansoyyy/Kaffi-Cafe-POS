@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _currentStaffName = '';
 
   final List<String> categories = [
+    'All',
     'Coffee',
     'Non-Coffee Drinks',
     'Pastries',
@@ -894,8 +895,10 @@ class _HomeScreenState extends State<HomeScreen>
                     (data['name'] as String?)?.toLowerCase() ?? '';
                 final productCategory = data['category'] as String? ?? '';
 
-                // Always filter by category
-                if (productCategory != category) return false;
+                // If "All" category is selected, show all products
+                // Otherwise, filter by specific category
+                if (category != 'All' && productCategory != category)
+                  return false;
 
                 // If searching, also filter by name
                 if (_searchQuery.isNotEmpty) {
@@ -975,18 +978,51 @@ class _HomeScreenState extends State<HomeScreen>
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          CircleAvatar(
-                                            radius: 30,
-                                            backgroundColor: AppTheme
-                                                .primaryColor
-                                                .withOpacity(0.1),
-                                            child: Icon(
-                                              _getCategoryIcon(
-                                                  data['category'] ?? 'Foods'),
-                                              size: 40,
-                                              color: AppTheme.primaryColor,
-                                            ),
-                                          ),
+                                          data['image'] != null &&
+                                                  data['image'] != ''
+                                              ? ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  child: Image.network(
+                                                    data['image'],
+                                                    width: 80,
+                                                    height: 80,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context,
+                                                        error, stackTrace) {
+                                                      return CircleAvatar(
+                                                        radius: 30,
+                                                        backgroundColor:
+                                                            AppTheme
+                                                                .primaryColor
+                                                                .withOpacity(
+                                                                    0.1),
+                                                        child: Icon(
+                                                          _getCategoryIcon(data[
+                                                                  'category'] ??
+                                                              'Foods'),
+                                                          size: 40,
+                                                          color: AppTheme
+                                                              .primaryColor,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                )
+                                              : CircleAvatar(
+                                                  radius: 30,
+                                                  backgroundColor: AppTheme
+                                                      .primaryColor
+                                                      .withOpacity(0.1),
+                                                  child: Icon(
+                                                    _getCategoryIcon(
+                                                        data['category'] ??
+                                                            'Foods'),
+                                                    size: 40,
+                                                    color:
+                                                        AppTheme.primaryColor,
+                                                  ),
+                                                ),
                                           const SizedBox(height: 12),
                                           TextWidget(
                                             text: data['name'] ?? 'Unnamed',

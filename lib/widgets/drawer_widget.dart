@@ -128,7 +128,7 @@ class DrawerWidget extends StatelessWidget {
                     );
                   },
                   title: TextWidget(
-                    text: 'Inventory',
+                    text: 'Products',
                     fontSize: 16,
                     fontFamily: 'Medium',
                     color: Colors.white,
