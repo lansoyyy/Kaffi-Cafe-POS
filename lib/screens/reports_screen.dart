@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -25,10 +26,21 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   String _selectedPeriod = 'Daily';
   DateTimeRange? _selectedDateRange;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _currentBranch;
 
   @override
   void initState() {
     super.initState();
+    _getCurrentBranch();
+  }
+
+  Future<void> _getCurrentBranch() async {
+    final currentBranch = await BranchService.getSelectedBranch();
+    if (mounted) {
+      setState(() {
+        _currentBranch = currentBranch;
+      });
+    }
   }
 
   Stream<QuerySnapshot> _getReceiptsStream() {
@@ -36,11 +48,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     if (_selectedDateRange != null) {
       return _firestore
           .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
           .where('timestamp',
               isGreaterThanOrEqualTo:
                   Timestamp.fromDate(_selectedDateRange!.start))
           .where('timestamp',
-              isLessThanOrEqualTo: Timestamp.fromDate(_selectedDateRange!.end))
+              isLessThanOrEqualTo: Timestamp.fromDate(
+                  _selectedDateRange!.end.add(Duration(days: 1))))
           .orderBy('timestamp', descending: true)
           .snapshots();
     }
@@ -48,6 +62,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       case 'Daily':
         return _firestore
             .collection('orders')
+            .where('branch', isEqualTo: _currentBranch)
             .where('timestamp',
                 isGreaterThanOrEqualTo:
                     Timestamp.fromDate(DateTime(now.year, now.month, now.day)))
@@ -60,6 +75,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         return _firestore
             .collection('orders')
+            .where('branch', isEqualTo: _currentBranch)
             .where('timestamp',
                 isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
             .where('timestamp',
@@ -70,17 +86,19 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       case 'Monthly':
         return _firestore
             .collection('orders')
+            .where('branch', isEqualTo: _currentBranch)
             .where('timestamp',
                 isGreaterThanOrEqualTo:
                     Timestamp.fromDate(DateTime(now.year, now.month, 1)))
             .where('timestamp',
                 isLessThanOrEqualTo:
-                    Timestamp.fromDate(DateTime(now.year, now.month + 1, 0)))
+                    Timestamp.fromDate(DateTime(now.year, now.month + 1, 1)))
             .orderBy('timestamp', descending: true)
             .snapshots();
       default:
         return _firestore
             .collection('orders')
+            .where('branch', isEqualTo: _currentBranch)
             .orderBy('timestamp', descending: true)
             .snapshots();
     }
@@ -93,27 +111,57 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     double weeklyIncome = 0.0;
     double monthlyIncome = 0.0;
 
-    final snapshot = await _firestore
+    // Get daily income
+    final dailySnapshot = await _firestore
         .collection('orders')
-        .orderBy('timestamp', descending: true)
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo:
+                Timestamp.fromDate(DateTime(now.year, now.month, now.day)))
+        .where('timestamp',
+            isLessThanOrEqualTo:
+                Timestamp.fromDate(DateTime(now.year, now.month, now.day + 1)))
         .get();
 
-    for (var doc in snapshot.docs) {
+    for (var doc in dailySnapshot.docs) {
       final data = doc.data();
-      final receiptDate = (data['timestamp'] as Timestamp).toDate();
       final total = (data['total'] as num).toDouble();
-      if (receiptDate.year == now.year &&
-          receiptDate.month == now.month &&
-          receiptDate.day == now.day) {
-        dailyIncome += total;
-      }
-      if (receiptDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
-          receiptDate.isBefore(startOfWeek.add(Duration(days: 7)))) {
-        weeklyIncome += total;
-      }
-      if (receiptDate.year == now.year && receiptDate.month == now.month) {
-        monthlyIncome += total;
-      }
+      dailyIncome += total;
+    }
+
+    // Get weekly income
+    final weeklySnapshot = await _firestore
+        .collection('orders')
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+        .where('timestamp',
+            isLessThanOrEqualTo:
+                Timestamp.fromDate(startOfWeek.add(Duration(days: 7))))
+        .get();
+
+    for (var doc in weeklySnapshot.docs) {
+      final data = doc.data();
+      final total = (data['total'] as num).toDouble();
+      weeklyIncome += total;
+    }
+
+    // Get monthly income
+    final monthlySnapshot = await _firestore
+        .collection('orders')
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo:
+                Timestamp.fromDate(DateTime(now.year, now.month, 1)))
+        .where('timestamp',
+            isLessThanOrEqualTo:
+                Timestamp.fromDate(DateTime(now.year, now.month + 1, 1)))
+        .get();
+
+    for (var doc in monthlySnapshot.docs) {
+      final data = doc.data();
+      final total = (data['total'] as num).toDouble();
+      monthlyIncome += total;
     }
 
     return {
@@ -140,8 +188,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         grouped[dateKey]!.add(receipt);
       }
       grouped.forEach((date, receipts) {
-        final totalSales =
-            receipts.fold(0.0, (sum, r) => sum + (r['total'] as num));
+        final totalSales = receipts.fold(
+            0.0, (sum, r) => sum + (r['total'] as num).toDouble());
         final transactions = receipts.length;
         report.add({
           'date': date,
@@ -161,8 +209,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               date.isBefore(weekEnd.add(Duration(days: 1)));
         }).toList();
         if (receiptsInWeek.isNotEmpty) {
-          final totalSales =
-              receiptsInWeek.fold(0.0, (sum, r) => sum + (r['total'] as num));
+          final totalSales = receiptsInWeek.fold(
+              0.0, (sum, r) => sum + (r['total'] as num).toDouble());
           final transactions = receiptsInWeek.length;
           report.add({
             'date': 'Week of ${DateFormat('MMM dd').format(weekStart)}',
@@ -176,13 +224,15 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     } else if (_selectedPeriod == 'Monthly') {
       for (int i = 0; i < 3; i++) {
         final month = DateTime(now.year, now.month - i, 1);
+        final nextMonth = DateTime(now.year, now.month - i + 1, 1);
         final receiptsInMonth = receipts.where((r) {
           final date = (r['timestamp'] as Timestamp).toDate();
-          return date.year == month.year && date.month == month.month;
+          return date.isAfter(month.subtract(Duration(days: 1))) &&
+              date.isBefore(nextMonth);
         }).toList();
         if (receiptsInMonth.isNotEmpty) {
-          final totalSales =
-              receiptsInMonth.fold(0.0, (sum, r) => sum + (r['total'] as num));
+          final totalSales = receiptsInMonth.fold(
+              0.0, (sum, r) => sum + (r['total'] as num).toDouble());
           final transactions = receiptsInMonth.length;
           report.add({
             'date': DateFormat('MMMM yyyy').format(month),
@@ -363,6 +413,26 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               fontFamily: 'Bold',
               color: Colors.white,
               isBold: true,
+            ),
+            const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentBranch ?? 'No Branch',
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
+              ),
             ),
             const Spacer(),
             SizedBox(
@@ -558,6 +628,35 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                   );
                                 }
                                 final salesReport = reportSnapshot.data ?? [];
+                                if (salesReport.isEmpty) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.receipt_long,
+                                          size: 64,
+                                          color: Colors.grey[400],
+                                        ),
+                                        SizedBox(height: 16),
+                                        TextWidget(
+                                          text: 'No sales data found',
+                                          fontSize: 18,
+                                          fontFamily: 'Medium',
+                                          color: Colors.grey[600],
+                                        ),
+                                        SizedBox(height: 8),
+                                        TextWidget(
+                                          text: 'Try adjusting the date range',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[500],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
                                 return SingleChildScrollView(
                                   child: DataTable(
                                     columnSpacing: 16,

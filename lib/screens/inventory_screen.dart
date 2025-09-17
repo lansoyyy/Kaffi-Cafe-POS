@@ -5,11 +5,15 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
+import 'package:kaffi_cafe_pos/utils/role_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
+import 'package:kaffi_cafe_pos/widgets/textfield_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
+import 'package:kaffi_cafe_pos/screens/home_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -27,6 +31,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   String _searchQuery = '';
   bool _isLoggedIn = false;
   File? _selectedImage;
+  String? _currentBranch;
 
   final List<String> _categories = [
     'All',
@@ -51,6 +56,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('is_staff_logged_in') ?? false;
+    final currentBranch = BranchService.getSelectedBranch();
+    final isSuperAdmin = await RoleService.isSuperAdmin();
+
+    // Check if branch is selected
+    if (currentBranch == null) {
+      // Redirect to branch selection screen if no branch is selected
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/branch');
+      }
+      return;
+    }
 
     if (!isLoggedIn) {
       // Redirect to staff login screen if not logged in
@@ -63,9 +79,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return;
     }
 
+    if (!isSuperAdmin) {
+      // Redirect to home screen if not Super Admin
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() {
         _isLoggedIn = true;
+        _currentBranch = currentBranch;
       });
     }
   }
@@ -217,10 +245,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       int stock,
       double price,
       String category,
-      String imageUrl) {
+      String imageUrl,
+      String description) {
     final nameController = TextEditingController(text: productName);
-    final stockController = TextEditingController(text: stock.toString());
     final priceController = TextEditingController(text: price.toString());
+    final descriptionController = TextEditingController(text: description);
     String selectedCategory = category.isEmpty ? 'Coffee' : category;
     String currentImageUrl = imageUrl;
     File? newImage;
@@ -383,10 +412,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: stockController,
-                    keyboardType: TextInputType.number,
+                    controller: descriptionController,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: 3,
                     decoration: InputDecoration(
-                      labelText: 'Stock (units)',
+                      labelText: 'Description / Ingredients',
                       labelStyle: TextStyle(color: Colors.grey[600]),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8)),
@@ -430,12 +460,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (nameController.text.isEmpty ||
-                    stockController.text.isEmpty ||
                     priceController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: TextWidget(
-                        text: 'Please fill in all fields',
+                        text: 'Please fill in all required fields',
                         fontSize: 14,
                         fontFamily: 'Regular',
                         color: Colors.white,
@@ -445,13 +474,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   );
                   return;
                 }
-                final stock = int.tryParse(stockController.text);
                 final price = double.tryParse(priceController.text);
-                if (stock == null || stock < 0 || price == null || price < 0) {
+                if (price == null || price < 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: TextWidget(
-                        text: 'Invalid stock or price',
+                        text: 'Invalid price',
                         fontSize: 14,
                         fontFamily: 'Regular',
                         color: Colors.white,
@@ -465,10 +493,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   final data = {
                     'name': nameController.text,
                     'searchName': nameController.text.toLowerCase(),
-                    'stock': stock,
                     'price': price,
                     'category': selectedCategory,
+                    'description': descriptionController.text,
                     'image': '', // Initialize with empty string
+                    'branch': _currentBranch, // Add branch information
                     'timestamp': FieldValue.serverTimestamp(),
                   };
 
@@ -619,6 +648,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
               color: Colors.white,
             ),
             const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentBranch ?? 'No Branch',
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 20),
             Expanded(
               child: Container(
                 height: 56,
@@ -678,7 +727,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         label: 'Add Product',
                         onPressed: () {
                           _showUpdateProductDialog(
-                              context, null, '', 0, 0.0, '', '');
+                              context, null, '', 0, 0.0, '', '', '');
                         },
                         fontSize: 18,
                         width: 180,
@@ -701,6 +750,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: StreamBuilder<QuerySnapshot>(
                       stream: _firestore
                           .collection('products')
+                          .where('branch', isEqualTo: _currentBranch)
                           .orderBy('timestamp', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
@@ -779,7 +829,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           itemBuilder: (context, index) {
                             final product = filteredProducts[index];
                             final data = product.data() as Map<String, dynamic>;
-                            final isLowStock = (data['stock'] as num) < 10;
+                            final isLowStock = false; // Stock is no longer used
                             return Padding(
                               padding:
                                   const EdgeInsets.symmetric(vertical: 10.0),
@@ -894,12 +944,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                               const SizedBox(height: 4),
                                               TextWidget(
                                                 text:
-                                                    'Stock: ${data['stock'] ?? 0} units',
+                                                    'Description: ${data['description'] ?? 'No description'}',
                                                 fontSize: 16,
                                                 fontFamily: 'Medium',
-                                                color: isLowStock
-                                                    ? Colors.red[600]
-                                                    : Colors.grey[600],
+                                                color: Colors.grey[600],
+                                                maxLines: 2,
                                               ),
                                               const SizedBox(height: 4),
                                               TextWidget(
@@ -928,14 +977,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   context,
                                                   product.id,
                                                   data['name'] ?? '',
-                                                  (data['stock'] as num?)
-                                                          ?.toInt() ??
-                                                      0,
+                                                  0, // Stock is no longer used
                                                   (data['price'] as num?)
                                                           ?.toDouble() ??
                                                       0.0,
                                                   data['category'] ?? '',
                                                   data['image'] ?? '',
+                                                  data['description'] ?? '',
                                                 );
                                               },
                                               icon: Icon(

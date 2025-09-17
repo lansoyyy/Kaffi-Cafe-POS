@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -21,15 +22,26 @@ class _OrderScreenState extends State<OrderScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _currentBranch;
 
   @override
   void initState() {
     super.initState();
+    _getCurrentBranch();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text;
       });
     });
+  }
+
+  Future<void> _getCurrentBranch() async {
+    final currentBranch = await BranchService.getSelectedBranch();
+    if (mounted) {
+      setState(() {
+        _currentBranch = currentBranch;
+      });
+    }
   }
 
   // Dialog for adding a new order
@@ -223,6 +235,7 @@ class _OrderScreenState extends State<OrderScreen> {
                   'total': total,
                   'status': 'Pending',
                   'timestamp': FieldValue.serverTimestamp(),
+                  'branch': _currentBranch,
                 });
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -801,6 +814,26 @@ class _OrderScreenState extends State<OrderScreen> {
             ),
             const SizedBox(width: 20),
             Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentBranch ?? 'No Branch',
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 20),
+            Container(
               width: 350,
               height: 48,
               decoration: BoxDecoration(
@@ -847,6 +880,7 @@ class _OrderScreenState extends State<OrderScreen> {
         child: StreamBuilder<QuerySnapshot>(
           stream: _firestore
               .collection('orders')
+              .where('branch', isEqualTo: _currentBranch)
               .orderBy('timestamp', descending: true)
               .snapshots(),
           builder: (context, snapshot) {

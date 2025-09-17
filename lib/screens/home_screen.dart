@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen>
   double _change = 0.0;
   bool _isLoggedIn = false;
   String _currentStaffName = '';
+  String? _currentBranch;
 
   final List<String> categories = [
     'All',
@@ -53,6 +55,16 @@ class _HomeScreenState extends State<HomeScreen>
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('is_staff_logged_in') ?? false;
     final staffName = prefs.getString('current_staff_name') ?? '';
+    final currentBranch = BranchService.getSelectedBranch();
+
+    // Check if branch is selected
+    if (currentBranch == null) {
+      // Redirect to branch selection screen if no branch is selected
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/branch');
+      }
+      return;
+    }
 
     if (!isLoggedIn) {
       // Redirect to staff login screen if not logged in
@@ -69,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _isLoggedIn = true;
         _currentStaffName = staffName;
+        _currentBranch = currentBranch;
       });
 
       _tabController = TabController(length: categories.length, vsync: this);
@@ -157,31 +170,7 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
     try {
-      final batch = _firestore.batch();
-      for (var item in _cartItems) {
-        final productRef = _firestore.collection('products').doc(item['docId']);
-        final productDoc = await productRef.get();
-        final currentStock =
-            (productDoc.data()?['stock'] as num?)?.toInt() ?? 0;
-        if (currentStock < item['quantity']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: TextWidget(
-                text: 'Insufficient stock for ${item['name']}',
-                fontSize: 14,
-                fontFamily: 'Regular',
-                color: Colors.white,
-              ),
-              backgroundColor: Colors.red[600],
-            ),
-          );
-          return;
-        }
-        batch.update(productRef, {
-          'stock': currentStock - item['quantity'],
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
+      // Since we removed stock tracking, we don't need to check or update stock
       final orderId =
           (await _firestore.collection('orders').get()).docs.length + 1001;
 
@@ -216,9 +205,8 @@ class _HomeScreenState extends State<HomeScreen>
         'status': 'Accepted',
         'timestamp': FieldValue.serverTimestamp(),
         'type': '',
-        'branch': ''
+        'branch': _currentBranch
       });
-      await batch.commit();
       setState(() {
         _cartItems.clear();
         _subtotal = 0.0;
@@ -262,6 +250,8 @@ class _HomeScreenState extends State<HomeScreen>
                   style: const pw.TextStyle(fontSize: 14)),
               pw.Text(
                   'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                  style: const pw.TextStyle(fontSize: 14)),
+              pw.Text('Branch: ${_currentBranch ?? ''}',
                   style: const pw.TextStyle(fontSize: 14)),
               pw.SizedBox(height: 20),
               pw.Text('Items:',
@@ -346,6 +336,8 @@ class _HomeScreenState extends State<HomeScreen>
                   style: const pw.TextStyle(fontSize: 12)),
               pw.Text(
                   'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Branch: ${_currentBranch ?? ''}',
                   style: const pw.TextStyle(fontSize: 10)),
               pw.SizedBox(height: 15),
               pw.Divider(),
@@ -463,6 +455,13 @@ class _HomeScreenState extends State<HomeScreen>
                     TextWidget(
                       text:
                           'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderData['timestamp'])}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Branch: ${_currentBranch ?? ''}',
                       fontSize: 14,
                       fontFamily: 'Regular',
                       color: Colors.grey[700],
@@ -740,6 +739,7 @@ class _HomeScreenState extends State<HomeScreen>
               stream: _firestore
                   .collection('orders')
                   .where('status', isEqualTo: 'Pending')
+                  .where('branch', isEqualTo: _currentBranch)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -788,6 +788,26 @@ class _HomeScreenState extends State<HomeScreen>
               fontSize: 18,
               fontFamily: 'Bold',
               color: Colors.white,
+            ),
+            const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentBranch ?? 'No Branch',
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(width: 20),
             Container(
@@ -871,6 +891,7 @@ class _HomeScreenState extends State<HomeScreen>
           return StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('products')
+                .where('branch', isEqualTo: _currentBranch)
                 .orderBy('timestamp', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {

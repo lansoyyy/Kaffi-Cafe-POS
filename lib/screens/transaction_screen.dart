@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -27,20 +28,142 @@ class TransactionScreen extends StatefulWidget {
 class _TransactionScreenState extends State<TransactionScreen> {
   DateTime? _selectedDay;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _currentBranch;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
+    _getCurrentBranch();
   }
 
-  Future<void> _deleteTransaction(String orderId, String itemName) async {
+  Future<void> _getCurrentBranch() async {
+    final currentBranch = await BranchService.getSelectedBranch();
+    if (mounted) {
+      setState(() {
+        _currentBranch = currentBranch;
+      });
+    }
+  }
+
+  // Modified: Changed from delete to print receipt
+  Future<void> _printReceipt(String orderId, String itemName,
+      Map<String, dynamic> transactionData) async {
+    final pdf = pw.Document();
     try {
-      await _firestore.collection('orders').doc(orderId).delete();
+      final data = transactionData;
+      final items = data['items'] as List<dynamic>;
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text('KAFFI CAFE',
+                    style: pw.TextStyle(
+                        fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                pw.Text(_currentBranch ?? '',
+                    style: const pw.TextStyle(fontSize: 14)),
+                pw.SizedBox(height: 10),
+                pw.Text('RECEIPT',
+                    style: pw.TextStyle(
+                        fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 10),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Order ID:'),
+                    pw.Text(data['orderId'] ?? ''),
+                  ],
+                ),
+                pw.SizedBox(height: 5),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Date:'),
+                    pw.Text(DateFormat('MMM dd, yyyy HH:mm')
+                        .format(data['timestamp'].toDate())),
+                  ],
+                ),
+                pw.SizedBox(height: 5),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Customer:'),
+                    pw.Text(data['buyer'] ?? 'N/A'),
+                  ],
+                ),
+                pw.SizedBox(height: 15),
+                pw.Table(
+                  border: pw.TableBorder.symmetric(),
+                  columnWidths: {
+                    0: const pw.FractionColumnWidth(0.6),
+                    1: const pw.FractionColumnWidth(0.2),
+                    2: const pw.FractionColumnWidth(0.2),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Text('Item',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Qty',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.center),
+                        pw.Text('Price',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.right),
+                      ],
+                    ),
+                    ...items.map((item) => pw.TableRow(
+                          children: [
+                            pw.Text(item['name']),
+                            pw.Text(item['quantity'].toString(),
+                                textAlign: pw.TextAlign.center),
+                            pw.Text(
+                                '₱${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                textAlign: pw.TextAlign.right),
+                          ],
+                        )),
+                  ],
+                ),
+                pw.SizedBox(height: 15),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('TOTAL:',
+                        style: pw.TextStyle(
+                            fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('₱${data['total'].toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                            fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text('Thank you for your purchase!',
+                    style: const pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 5),
+                pw.Text('Please come again!',
+                    style: const pw.TextStyle(fontSize: 12)),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdf.save());
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Transaction for $itemName deleted successfully',
+            text: 'Receipt printed successfully',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
@@ -52,7 +175,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Error deleting transaction: $e',
+            text: 'Error printing receipt: $e',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
@@ -178,13 +301,15 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       child: ButtonWidget(
                         width: 200,
                         radius: 8,
-                        color: festiveRed,
+                        color: AppTheme.primaryColor,
                         textColor: Colors.white,
-                        label: 'Delete Transaction',
+                        label: 'Print Receipt',
                         onPressed: () {
                           Navigator.pop(context);
-                          _deleteTransaction(transactionData['orderId'],
-                              transactionData['items'][0]['name']);
+                          _printReceipt(
+                              transactionData['orderId'],
+                              transactionData['items'][0]['name'],
+                              transactionData);
                         },
                         fontSize: 14,
                       ),
@@ -242,6 +367,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
     try {
       final QuerySnapshot snapshot = await _firestore
           .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
           .where('timestamp',
               isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(
                   _selectedDay!.year, _selectedDay!.month, _selectedDay!.day)))
@@ -301,6 +427,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
     try {
       final QuerySnapshot snapshot = await _firestore
           .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
           .where('timestamp',
               isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(
                   _selectedDay!.year, _selectedDay!.month, _selectedDay!.day)))
@@ -381,11 +508,35 @@ class _TransactionScreenState extends State<TransactionScreen> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
-        title: TextWidget(
-          text: 'Transactions',
-          fontSize: 20,
-          fontFamily: 'Bold',
-          color: Colors.white,
+        title: Row(
+          children: [
+            TextWidget(
+              text: 'Transactions',
+              fontSize: 20,
+              fontFamily: 'Bold',
+              color: Colors.white,
+            ),
+            const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  TextWidget(
+                    text: _currentBranch ?? 'No Branch',
+                    fontSize: 14,
+                    fontFamily: 'Medium',
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
       body: Row(
@@ -433,6 +584,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       StreamBuilder<QuerySnapshot>(
                         stream: _firestore
                             .collection('orders')
+                            .where('branch', isEqualTo: _currentBranch)
                             .where('timestamp',
                                 isGreaterThanOrEqualTo: Timestamp.fromDate(
                                     DateTime(
@@ -544,6 +696,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                           child: StreamBuilder<QuerySnapshot>(
                             stream: _firestore
                                 .collection('orders')
+                                .where('branch', isEqualTo: _currentBranch)
                                 .where('timestamp',
                                     isGreaterThanOrEqualTo: Timestamp.fromDate(
                                         DateTime(
@@ -778,11 +931,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
           padding: const EdgeInsets.all(8.0),
           child: IconButton(
             icon: Icon(
-              Icons.delete,
-              color: festiveRed,
+              Icons.print,
+              color: AppTheme.primaryColor,
               size: 20,
             ),
-            onPressed: () => _deleteTransaction(orderId, item),
+            onPressed: () => _printReceipt(orderId, item, transactionData),
           ),
         ),
       ],
