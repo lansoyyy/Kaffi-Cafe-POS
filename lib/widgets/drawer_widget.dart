@@ -243,30 +243,32 @@ class _DrawerWidgetState extends State<DrawerWidget> {
                   ),
                   DividerWidget(),
                 ],
-                ListTile(
-                  leading: const Icon(
-                    Icons.settings,
-                    color: Colors.white,
-                    size: 26,
+                if (_isSuperAdmin) ...[
+                  ListTile(
+                    leading: const Icon(
+                      Icons.settings,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                    onTap: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingsScreen()),
+                      );
+                    },
+                    title: TextWidget(
+                      text: 'Settings',
+                      fontSize: 16,
+                      fontFamily: 'Medium',
+                      color: Colors.white,
+                    ),
+                    hoverColor: Colors.white10,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const SettingsScreen()),
-                    );
-                  },
-                  title: TextWidget(
-                    text: 'Settings',
-                    fontSize: 16,
-                    fontFamily: 'Medium',
-                    color: Colors.white,
-                  ),
-                  hoverColor: Colors.white10,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+                ],
                 DividerWidget(),
                 ListTile(
                   leading: const Icon(
