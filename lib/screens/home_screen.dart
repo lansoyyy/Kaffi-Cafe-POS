@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -35,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isLoggedIn = false;
   String _currentStaffName = '';
   String? _currentBranch;
+  String _selectedPaymentMethod = 'Cash';
 
   final List<String> categories = [
     'All',
@@ -103,21 +103,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _addToCart(Map<String, dynamic> product) {
-    setState(() {
-      final existingItemIndex =
-          _cartItems.indexWhere((item) => item['name'] == product['name']);
-      if (existingItemIndex != -1) {
-        _cartItems[existingItemIndex]['quantity'] += 1;
-      } else {
-        _cartItems.add({
-          'name': product['name'],
-          'price': product['price'],
-          'quantity': 1,
-          'docId': product['docId'],
-        });
-      }
-      _calculateSubtotal();
-    });
+    _showCustomizationDialog(product);
   }
 
   void _removeFromCart(int index) {
@@ -130,7 +116,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _calculateSubtotal() {
     _subtotal = _cartItems.fold(
-        0.0, (sum, item) => sum + item['price'] * item['quantity']);
+        0.0,
+        (sum, item) =>
+            sum + (item['totalPrice'] ?? item['price']) * item['quantity']);
   }
 
   void _calculateChange() {
@@ -138,6 +126,297 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _change = amountPaid - _subtotal;
     });
+  }
+
+  void _showPaymentMethodDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Payment Method'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Cash'),
+              leading: Radio<String>(
+                value: 'Cash',
+                groupValue: _selectedPaymentMethod,
+                onChanged: (String? value) {
+                  setState(() {
+                    _selectedPaymentMethod = value!;
+                  });
+                  Navigator.pop(context);
+                  _completePayment('Cash');
+                },
+              ),
+              onTap: () {
+                setState(() {
+                  _selectedPaymentMethod = 'Cash';
+                });
+                Navigator.pop(context);
+                _completePayment('Cash');
+              },
+            ),
+            ListTile(
+              title: const Text('GCash'),
+              leading: Radio<String>(
+                value: 'GCash',
+                groupValue: _selectedPaymentMethod,
+                onChanged: (String? value) {
+                  setState(() {
+                    _selectedPaymentMethod = value!;
+                  });
+                  Navigator.pop(context);
+                  _completePayment('GCash');
+                },
+              ),
+              onTap: () {
+                setState(() {
+                  _selectedPaymentMethod = 'GCash';
+                });
+                Navigator.pop(context);
+                _completePayment('GCash');
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomizationDialog(Map<String, dynamic> product) {
+    int quantity = 1;
+    String selectedEspresso = 'Standard (double)';
+    bool addShot = false;
+    String selectedSize = 'Regular';
+    String selectedSweetness = 'Regular Sweetness';
+    String selectedIce = 'Regular';
+
+    final List<String> espressoOptions = [
+      'Standard (double)',
+    ];
+
+    final List<String> sizeOptions = [
+      'Regular',
+      'Large',
+    ];
+
+    final List<String> sweetnessLevels = [
+      'Regular Sweetness',
+      'Less Sweet',
+      'Extra Sweet',
+    ];
+
+    final List<String> iceLevels = [
+      'Regular',
+      'Less Ice',
+    ];
+
+    double calculateTotalPrice() {
+      double basePrice = product['price'].toDouble();
+      double addShotPrice = addShot ? 25.0 : 0.0;
+      double sizePrice = selectedSize == 'Large' ? 15.0 : 0.0;
+      return basePrice + addShotPrice + sizePrice;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            double totalPrice = calculateTotalPrice();
+
+            return AlertDialog(
+              title: Text('Customize ${product['name']}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Quantity
+                    Row(
+                      children: [
+                        const Text('Quantity:'),
+                        const SizedBox(width: 20),
+                        IconButton(
+                          icon: const Icon(Icons.remove),
+                          onPressed: () {
+                            if (quantity > 1) {
+                              setState(() => quantity--);
+                            }
+                          },
+                        ),
+                        Text(quantity.toString()),
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            setState(() => quantity++);
+                          },
+                        ),
+                      ],
+                    ),
+
+                    // Espresso Options
+                    if (product['category'] == 'Coffee') ...[
+                      const SizedBox(height: 16),
+                      const Text('Espresso:'),
+                      DropdownButton<String>(
+                        value: selectedEspresso,
+                        isExpanded: true,
+                        items: espressoOptions.map((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() => selectedEspresso = newValue!);
+                        },
+                      ),
+                    ],
+
+                    // Size Options
+                    const SizedBox(height: 16),
+                    const Text('Size:'),
+                    DropdownButton<String>(
+                      value: selectedSize,
+                      isExpanded: true,
+                      items: sizeOptions.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() => selectedSize = newValue!);
+                      },
+                    ),
+
+                    // Sweetness Level
+                    const SizedBox(height: 16),
+                    const Text('Sweetness Level:'),
+                    DropdownButton<String>(
+                      value: selectedSweetness,
+                      isExpanded: true,
+                      items: sweetnessLevels.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() => selectedSweetness = newValue!);
+                      },
+                    ),
+
+                    // Ice Level
+                    const SizedBox(height: 16),
+                    const Text('Ice Level:'),
+                    DropdownButton<String>(
+                      value: selectedIce,
+                      isExpanded: true,
+                      items: iceLevels.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() => selectedIce = newValue!);
+                      },
+                    ),
+
+                    // Add Shot
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Text('Add Extra Shot (+₱25)'),
+                        const Spacer(),
+                        Switch(
+                          value: addShot,
+                          onChanged: (bool value) {
+                            setState(() => addShot = value);
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+                    Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Price:'),
+                        Text(
+                          '₱${totalPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      final customization = {
+                        'name': product['name'],
+                        'price': product['price'],
+                        'totalPrice': totalPrice,
+                        'quantity': quantity,
+                        'docId': product['docId'],
+                        'customizations': {
+                          'espresso': selectedEspresso,
+                          'size': selectedSize,
+                          'sweetness': selectedSweetness,
+                          'ice': selectedIce,
+                          'addShot': addShot,
+                        },
+                      };
+
+                      final existingItemIndex = _cartItems.indexWhere((item) =>
+                          item['name'] == product['name'] &&
+                          item['customizations']?['espresso'] ==
+                              selectedEspresso &&
+                          item['customizations']?['size'] == selectedSize &&
+                          item['customizations']?['sweetness'] ==
+                              selectedSweetness &&
+                          item['customizations']?['ice'] == selectedIce &&
+                          item['customizations']?['addShot'] == addShot);
+
+                      if (existingItemIndex != -1) {
+                        _cartItems[existingItemIndex]['quantity'] += quantity;
+                      } else {
+                        _cartItems.add(customization);
+                      }
+
+                      _calculateSubtotal();
+                      _calculateChange();
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Add to Cart'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _processPayment() async {
@@ -169,6 +448,12 @@ class _HomeScreenState extends State<HomeScreen>
       );
       return;
     }
+
+    // Show payment method selection
+    _showPaymentMethodDialog();
+  }
+
+  Future<void> _completePayment(String selectedPaymentMethod) async {
     try {
       // Since we removed stock tracking, we don't need to check or update stock
       final orderId =
@@ -183,6 +468,8 @@ class _HomeScreenState extends State<HomeScreen>
                   'name': item['name'],
                   'quantity': item['quantity'],
                   'price': item['price'],
+                  'totalPrice': item['totalPrice'] ?? item['price'],
+                  'customizations': item['customizations'],
                 })
             .toList(),
         'subtotal': _subtotal,
@@ -191,31 +478,41 @@ class _HomeScreenState extends State<HomeScreen>
         'change': _change,
       };
 
-      await _firestore.collection('orders').add({
-        'orderId': orderId.toString(),
-        'buyer': 'Cashier',
-        'items': _cartItems
-            .map((item) => {
-                  'name': item['name'],
-                  'quantity': item['quantity'],
-                  'price': item['price'],
-                })
-            .toList(),
-        'total': _subtotal,
-        'status': 'Accepted',
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': '',
-        'branch': _currentBranch
-      });
-      setState(() {
-        _cartItems.clear();
-        _subtotal = 0.0;
-        _change = 0.0;
-        _amountController.clear();
-      });
+      if (selectedPaymentMethod == 'GCash') {
+        // For GCash payments, simulate the payment process
+        // In a real implementation, you would integrate with PayMongo
+        await _processGCashPayment(orderData);
+      } else {
+        // For Cash payments, proceed directly
+        await _firestore.collection('orders').add({
+          'orderId': orderId.toString(),
+          'buyer': 'Cashier',
+          'items': _cartItems
+              .map((item) => {
+                    'name': item['name'],
+                    'quantity': item['quantity'],
+                    'price': item['price'],
+                    'totalPrice': item['totalPrice'] ?? item['price'],
+                    'customizations': item['customizations'],
+                  })
+              .toList(),
+          'total': _subtotal,
+          'status': 'Accepted',
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': '',
+          'branch': _currentBranch,
+          'paymentMethod': selectedPaymentMethod,
+        });
+        setState(() {
+          _cartItems.clear();
+          _subtotal = 0.0;
+          _change = 0.0;
+          _amountController.clear();
+        });
 
-      // Show payment success dialog with order data
-      _showPaymentSuccessDialog(orderData);
+        // Show payment success dialog with order data
+        _showPaymentSuccessDialog(orderData);
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -228,6 +525,91 @@ class _HomeScreenState extends State<HomeScreen>
           backgroundColor: Colors.red[600],
         ),
       );
+    }
+  }
+
+  Future<void> _processGCashPayment(Map<String, dynamic> orderData) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Processing GCash payment...'),
+            ],
+          ),
+        ),
+      );
+
+      // Simulate GCash payment processing
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // For actual PayMongo integration, you would:
+      // 1. Create a payment source with PayMongo
+      // 2. Get the checkout URL
+      // 3. Launch the URL for customer payment
+      // 4. Handle the payment callback
+
+      // For now, simulate successful GCash payment
+      final orderId =
+          (await _firestore.collection('orders').get()).docs.length + 1001;
+
+      await _firestore.collection('orders').add({
+        'orderId': orderId.toString(),
+        'buyer': 'Cashier',
+        'items': _cartItems
+            .map((item) => {
+                  'name': item['name'],
+                  'quantity': item['quantity'],
+                  'price': item['price'],
+                  'totalPrice': item['totalPrice'] ?? item['price'],
+                  'customizations': item['customizations'],
+                })
+            .toList(),
+        'total': _subtotal,
+        'status': 'Accepted',
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': '',
+        'branch': _currentBranch,
+        'paymentMethod': _selectedPaymentMethod,
+        'paymentStatus': 'Paid',
+      });
+
+      setState(() {
+        _cartItems.clear();
+        _subtotal = 0.0;
+        _change = 0.0;
+        _amountController.clear();
+      });
+
+      if (context.mounted) {
+        _showPaymentSuccessDialog(orderData);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('GCash payment processed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('GCash payment failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -253,6 +635,8 @@ class _HomeScreenState extends State<HomeScreen>
                   style: const pw.TextStyle(fontSize: 14)),
               pw.Text('Branch: ${_currentBranch ?? ''}',
                   style: const pw.TextStyle(fontSize: 14)),
+              pw.Text('Payment: $_selectedPaymentMethod',
+                  style: const pw.TextStyle(fontSize: 14)),
               pw.SizedBox(height: 20),
               pw.Text('Items:',
                   style: pw.TextStyle(
@@ -276,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen>
                         pw.Expanded(
                           flex: 2,
                           child: pw.Text(
-                              'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                              'P${((item['totalPrice'] ?? item['price']) * item['quantity']).toStringAsFixed(2)}',
                               style: const pw.TextStyle(fontSize: 12)),
                         ),
                       ],
@@ -339,6 +723,8 @@ class _HomeScreenState extends State<HomeScreen>
                   style: const pw.TextStyle(fontSize: 10)),
               pw.Text('Branch: ${_currentBranch ?? ''}',
                   style: const pw.TextStyle(fontSize: 10)),
+              pw.Text('Payment: $_selectedPaymentMethod',
+                  style: const pw.TextStyle(fontSize: 10)),
               pw.SizedBox(height: 15),
               pw.Divider(),
               ...orderData['items'].map<pw.Widget>((item) => pw.Padding(
@@ -351,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen>
                               style: const pw.TextStyle(fontSize: 10)),
                         ),
                         pw.Text(
-                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                            'P${((item['totalPrice'] ?? item['price']) * item['quantity']).toStringAsFixed(2)}',
                             style: const pw.TextStyle(fontSize: 10)),
                       ],
                     ),
@@ -462,6 +848,13 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 8),
                     TextWidget(
                       text: 'Branch: ${_currentBranch ?? ''}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Payment: $_selectedPaymentMethod',
                       fontSize: 14,
                       fontFamily: 'Regular',
                       color: Colors.grey[700],
@@ -1130,9 +1523,28 @@ class _HomeScreenState extends State<HomeScreen>
                                                   fontFamily: 'Medium',
                                                   color: Colors.grey[800],
                                                 ),
+                                                if (item['customizations'] !=
+                                                    null) ...[
+                                                  TextWidget(
+                                                    text:
+                                                        '${item['customizations']['size']}, ${item['customizations']['sweetness']}, ${item['customizations']['ice']}',
+                                                    fontSize: 12,
+                                                    fontFamily: 'Regular',
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  if (item['customizations']
+                                                          ['addShot'] ==
+                                                      true)
+                                                    TextWidget(
+                                                      text: '+ Extra Shot',
+                                                      fontSize: 12,
+                                                      fontFamily: 'Regular',
+                                                      color: Colors.blue[600],
+                                                    ),
+                                                ],
                                                 TextWidget(
                                                   text:
-                                                      'P${(item['price'] as num).toStringAsFixed(2)}',
+                                                      'P${(item['totalPrice'] ?? item['price'] as num).toStringAsFixed(2)}',
                                                   fontSize: 14,
                                                   fontFamily: 'Regular',
                                                   color: Colors.grey[600],
@@ -1214,6 +1626,33 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                               const SizedBox(height: 20),
                               Divider(color: Colors.grey[300], thickness: 1.5),
+                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    TextWidget(
+                                      text: 'Payment Method:',
+                                      fontSize: 14,
+                                      fontFamily: 'Medium',
+                                      color: Colors.grey[700],
+                                    ),
+                                    TextWidget(
+                                      text: _selectedPaymentMethod,
+                                      fontSize: 14,
+                                      fontFamily: 'Bold',
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 20),
                               Center(
                                 child: ButtonWidget(

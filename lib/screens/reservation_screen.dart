@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -16,27 +17,134 @@ class ReservationScreen extends StatefulWidget {
 
 class _ReservationScreenState extends State<ReservationScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _currentBranch;
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
-  String? _selectedSeat;
+  String? _selectedTableId;
   int _numberOfGuests = 1;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _orderController = TextEditingController();
-  final List<String> _timeSlots = [
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '1:00 PM',
-    '2:00 PM',
-    '3:00 PM',
-    '4:00 PM',
-    '5:00 PM',
-  ];
+  List<String> _availableTimeSlots = [];
+  bool _isLoading = true;
+  Map<String, bool> _tableAvailability = {};
 
   @override
   void initState() {
     super.initState();
-    // Initialize default values if needed
+    _initializeReservation();
+  }
+
+  // Initialize reservation data
+  Future<void> _initializeReservation() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Get current branch
+    _currentBranch = BranchService.getSelectedBranch();
+
+    // Initialize table availability
+    for (var table in _tables) {
+      _tableAvailability[table['id']] = true;
+    }
+
+    // Generate available time slots based on operating hours
+    _generateTimeSlots();
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  // Tables configuration (3 tables with 2 seats, 2 tables with 4 seats)
+  final List<Map<String, dynamic>> _tables = [
+    {'id': 'table1', 'name': 'Table 1', 'capacity': 2},
+    {'id': 'table2', 'name': 'Table 2', 'capacity': 2},
+    {'id': 'table3', 'name': 'Table 3', 'capacity': 2},
+    {'id': 'table4', 'name': 'Table 4', 'capacity': 4},
+    {'id': 'table5', 'name': 'Table 5', 'capacity': 4},
+  ];
+
+  // Generate available time slots based on operating hours (7:00 AM - 11:00 PM)
+  void _generateTimeSlots() {
+    final now = DateTime.now();
+    final List<String> slots = [];
+
+    // Operating hours: 7:00 AM to 11:00 PM
+    // Last slot: 10:00-10:59 PM
+    for (int hour = 7; hour <= 22; hour++) {
+      // Skip past hours for today
+      if (_selectedDate.day == now.day &&
+          _selectedDate.month == now.month &&
+          _selectedDate.year == now.year &&
+          hour <= now.hour) {
+        continue;
+      }
+
+      // Format hour for 12-hour clock
+      String period = hour < 12 ? 'AM' : 'PM';
+      int displayHour = hour <= 12 ? hour : hour - 12;
+      if (displayHour == 0) displayHour = 12;
+
+      String timeSlot = '$displayHour:00 $period';
+      slots.add(timeSlot);
+    }
+
+    setState(() {
+      _availableTimeSlots = slots;
+    });
+  }
+
+  // Check if a table is available for a specific date and time
+  Future<bool> _checkTableAvailability(
+      String tableId, DateTime date, String time) async {
+    try {
+      // Format date for Firestore query
+      String formattedDate =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // Query reservations for the same date, time, and table
+      final QuerySnapshot snapshot = await _firestore
+          .collection('reservations')
+          .where('tableId', isEqualTo: tableId)
+          .where('reservation.date',
+              isEqualTo: DateFormat('dd/MM/yyyy').format(date))
+          .where('reservation.time', isEqualTo: time)
+          .where('reservation.status',
+              whereIn: ['confirmed', 'checked_in']).get();
+
+      // If no reservations found, table is available
+      return snapshot.docs.isEmpty;
+    } catch (e) {
+      print('Error checking table availability: $e');
+      return false;
+    }
+  }
+
+  // Update table availability based on selected date and time
+  Future<void> _updateTableAvailability() async {
+    if (_selectedTime == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Check availability for each table
+    for (var table in _tables) {
+      bool isAvailable = await _checkTableAvailability(
+        table['id'],
+        _selectedDate,
+        _selectedTime!,
+      );
+
+      setState(() {
+        _tableAvailability[table['id']] = isAvailable;
+      });
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -70,18 +178,16 @@ class _ReservationScreenState extends State<ReservationScreen> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _selectedTime = null;
-        _selectedSeat = null;
-        _nameController.clear();
-        _orderController.clear();
-        _numberOfGuests = 1;
+        _selectedTime = null; // Reset time when date changes
+        _selectedTableId = null; // Reset table when date changes
+        _generateTimeSlots(); // Regenerate time slots for new date
       });
     }
   }
 
   void _showReservationDetails(
-      BuildContext context, Map<String, dynamic> seat) {
-    final reservation = seat['reservation'];
+      BuildContext context, Map<String, dynamic> table) {
+    final reservation = table['reservation'];
     final screenWidth = MediaQuery.of(context).size.width;
     final fontSize = screenWidth * 0.018;
 
@@ -91,8 +197,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         backgroundColor: plainWhite,
         title: TextWidget(
-          text: seat['seat'] +
-              (seat['available'] ? ' (Available)' : ' (Occupied)'),
+          text: table['name'] +
+              (table['available'] ? ' (Available)' : ' (Occupied)'),
           fontSize: fontSize + 4,
           color: textBlack,
           isBold: true,
@@ -148,7 +254,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     TextWidget(
                       text: 'Status: ${reservation['status']}',
                       fontSize: fontSize + 2,
-                      color: reservation['status'] == 'Confirmed'
+                      color: reservation['status'] == 'confirmed'
                           ? AppTheme.primaryColor
                           : festiveRed,
                       fontFamily: 'Regular',
@@ -160,15 +266,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
           if (reservation != null)
             ButtonWidget(
               label:
-                  reservation['status'] == 'Confirmed' ? 'Cancel' : 'Confirm',
+                  reservation['status'] == 'confirmed' ? 'Cancel' : 'Confirm',
               onPressed: () async {
                 try {
-                  final newStatus = reservation['status'] == 'Confirmed'
-                      ? 'Cancelled'
-                      : 'Confirmed';
+                  final newStatus = reservation['status'] == 'confirmed'
+                      ? 'cancelled'
+                      : 'confirmed';
                   await _firestore
                       .collection('reservations')
-                      .doc(seat['docId'])
+                      .doc(table['docId'])
                       .update({
                     'reservation.status': newStatus,
                     'updatedAt': FieldValue.serverTimestamp(),
@@ -201,7 +307,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   );
                 }
               },
-              color: reservation['status'] == 'Confirmed'
+              color: reservation['status'] == 'confirmed'
                   ? festiveRed
                   : AppTheme.primaryColor,
               textColor: plainWhite,
@@ -215,7 +321,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               label: 'Edit',
               onPressed: () {
                 Navigator.of(context).pop();
-                _showEditReservationDialog(context, seat);
+                _showEditReservationDialog(context, table);
               },
               color: AppTheme.primaryColor,
               textColor: plainWhite,
@@ -240,11 +346,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showCreateReservationDialog(BuildContext context) {
-    if (_selectedTime == null || _selectedSeat == null) {
+    if (_selectedTime == null || _selectedTableId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Please select a time and seat',
+            text: 'Please select a time and table',
             fontSize: 14,
             color: plainWhite,
             fontFamily: 'Regular',
@@ -267,7 +373,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         backgroundColor: plainWhite,
         title: TextWidget(
-          text: 'Create Reservation for $_selectedSeat',
+          text:
+              'Create Reservation for ${_tables.firstWhere((t) => t['id'] == _selectedTableId)['name']}',
           fontSize: fontSize + 4,
           color: textBlack,
           isBold: true,
@@ -291,7 +398,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -315,7 +423,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -378,19 +487,19 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 return;
               }
               try {
-                final selectedSeatData =
-                    allSeats.firstWhere((s) => s['seat'] == _selectedSeat);
+                final selectedTable =
+                    _tables.firstWhere((t) => t['id'] == _selectedTableId);
                 await _firestore.collection('reservations').add({
-                  'seat': _selectedSeat,
-                  'capacity': selectedSeatData['capacity'],
-                  'available': false,
+                  'tableId': _selectedTableId,
+                  'tableName': selectedTable['name'],
+                  'capacity': selectedTable['capacity'],
                   'reservation': {
                     'name': _nameController.text,
                     'date': DateFormat('dd/MM/yyyy').format(_selectedDate),
                     'time': _selectedTime,
                     'guests': _numberOfGuests,
                     'order': _orderController.text,
-                    'status': 'Confirmed',
+                    'status': 'confirmed',
                     'source': 'POS', // Indicates reservation made via POS
                   },
                   'createdAt': FieldValue.serverTimestamp(),
@@ -399,7 +508,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 Navigator.of(context).pop();
                 setState(() {
                   _selectedTime = null;
-                  _selectedSeat = null;
+                  _selectedTableId = null;
                   _nameController.clear();
                   _orderController.clear();
                   _numberOfGuests = 1;
@@ -408,7 +517,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   SnackBar(
                     content: TextWidget(
                       text:
-                          'Reservation confirmed for $_selectedSeat at $_selectedTime',
+                          'Reservation confirmed for ${_tables.firstWhere((t) => t['id'] == _selectedTableId)['name']} at $_selectedTime',
                       fontSize: fontSize,
                       color: plainWhite,
                       fontFamily: 'Regular',
@@ -443,8 +552,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   void _showEditReservationDialog(
-      BuildContext context, Map<String, dynamic> seat) {
-    final reservation = seat['reservation'];
+      BuildContext context, Map<String, dynamic> table) {
+    final reservation = table['reservation'];
     final screenWidth = MediaQuery.of(context).size.width;
     final fontSize = screenWidth * 0.018;
 
@@ -457,7 +566,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         backgroundColor: plainWhite,
         title: TextWidget(
-          text: 'Edit Reservation for ${seat['seat']}',
+          text: 'Edit Reservation for ${table['name']}',
           fontSize: fontSize + 4,
           color: textBlack,
           isBold: true,
@@ -481,7 +590,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -505,7 +615,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                 ),
                 style: TextStyle(
@@ -570,7 +681,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               try {
                 await _firestore
                     .collection('reservations')
-                    .doc(seat['docId'])
+                    .doc(table['docId'])
                     .update({
                   'reservation.name': _nameController.text,
                   'reservation.order': _orderController.text,
@@ -619,52 +730,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
-  // Define the list of all possible seats
-  final List<Map<String, dynamic>> allSeats = [
-    {
-      'seat': 'Table 1',
-      'capacity': 2,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-    {
-      'seat': 'Table 2',
-      'capacity': 4,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-    {
-      'seat': 'Table 3',
-      'capacity': 4,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-    {
-      'seat': 'Table 4',
-      'capacity': 6,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-    {
-      'seat': 'Booth 1',
-      'capacity': 4,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-    {
-      'seat': 'Booth 2',
-      'capacity': 6,
-      'available': true,
-      'reservation': null,
-      'docId': null
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -692,163 +757,167 @@ class _ReservationScreenState extends State<ReservationScreen> {
           children: [
             Expanded(
               flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextWidget(
-                    text: 'Select Date',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Select Date',
+                      fontSize: 24,
+                      color: textBlack,
+                      isBold: true,
+                      fontFamily: 'Bold',
+                      letterSpacing: 1,
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
-                        color: plainWhite,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextWidget(
-                            text:
-                                DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            fontSize: fontSize + 2,
-                            color: textBlack,
-                            isBold: true,
-                            fontFamily: 'Bold',
-                          ),
-                          ButtonWidget(
-                            label: 'Pick Date',
-                            onPressed: () => _selectDate(context),
-                            color: AppTheme.primaryColor,
-                            textColor: plainWhite,
-                            fontSize: fontSize + 1,
-                            height: 50,
-                            radius: 12,
-                            width: 120,
-                          ),
-                        ],
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          color: plainWhite,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextWidget(
+                              text: DateFormat('dd/MM/yyyy')
+                                  .format(_selectedDate),
+                              fontSize: fontSize + 2,
+                              color: textBlack,
+                              isBold: true,
+                              fontFamily: 'Bold',
+                            ),
+                            ButtonWidget(
+                              label: 'Pick Date',
+                              onPressed: () => _selectDate(context),
+                              color: AppTheme.primaryColor,
+                              textColor: plainWhite,
+                              fontSize: fontSize + 1,
+                              height: 50,
+                              radius: 12,
+                              width: 120,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextWidget(
-                    text: 'Select Time',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: _timeSlots.map((time) {
-                      final isSelected = _selectedTime == time;
-                      return ChoiceChip(
-                        showCheckmark: false,
-                        label: TextWidget(
-                          text: time,
+                    const SizedBox(height: 20),
+                    TextWidget(
+                      text: 'Number of Guests',
+                      fontSize: 24,
+                      color: textBlack,
+                      isBold: true,
+                      fontFamily: 'Bold',
+                      letterSpacing: 1,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        ButtonWidget(
+                          label: '-',
+                          onPressed: () {
+                            setState(() {
+                              if (_numberOfGuests > 1) _numberOfGuests--;
+                            });
+                          },
+                          color: ashGray,
+                          textColor: textBlack,
                           fontSize: fontSize + 1,
-                          color: isSelected ? plainWhite : textBlack,
-                          isBold: isSelected,
+                          height: 50,
+                          width: 60,
+                          radius: 10,
+                        ),
+                        const SizedBox(width: 16),
+                        TextWidget(
+                          text:
+                              '$_numberOfGuests Guest${_numberOfGuests > 1 ? 's' : ''}',
+                          fontSize: fontSize + 2,
+                          color: textBlack,
                           fontFamily: 'Regular',
                         ),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
+                        const SizedBox(width: 16),
+                        ButtonWidget(
+                          label: '+',
+                          onPressed: () {
                             setState(() {
-                              _selectedTime = time;
-                              _selectedSeat = null;
+                              _numberOfGuests++;
                             });
-                          }
-                        },
-                        backgroundColor: cloudWhite,
-                        selectedColor: AppTheme.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(
-                            color: isSelected ? AppTheme.primaryColor : ashGray,
-                            width: 1.5,
-                          ),
+                          },
+                          color: AppTheme.primaryColor,
+                          textColor: plainWhite,
+                          fontSize: fontSize + 1,
+                          height: 50,
+                          width: 60,
+                          radius: 10,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        elevation: isSelected ? 4 : 0,
-                        pressElevation: 6,
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  TextWidget(
-                    text: 'Number of Guests',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      ButtonWidget(
-                        label: '-',
-                        onPressed: () {
-                          setState(() {
-                            if (_numberOfGuests > 1) _numberOfGuests--;
-                          });
-                        },
-                        color: ashGray,
-                        textColor: textBlack,
-                        fontSize: fontSize + 1,
-                        height: 50,
-                        width: 60,
-                        radius: 10,
-                      ),
-                      const SizedBox(width: 16),
-                      TextWidget(
-                        text:
-                            '$_numberOfGuests Guest${_numberOfGuests > 1 ? 's' : ''}',
-                        fontSize: fontSize + 2,
-                        color: textBlack,
-                        fontFamily: 'Regular',
-                      ),
-                      const SizedBox(width: 16),
-                      ButtonWidget(
-                        label: '+',
-                        onPressed: () {
-                          setState(() {
-                            _numberOfGuests++;
-                          });
-                        },
-                        color: AppTheme.primaryColor,
-                        textColor: plainWhite,
-                        fontSize: fontSize + 1,
-                        height: 50,
-                        width: 60,
-                        radius: 10,
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    TextWidget(
+                      text: 'Select Time',
+                      fontSize: 24,
+                      color: textBlack,
+                      isBold: true,
+                      fontFamily: 'Bold',
+                      letterSpacing: 1,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: _availableTimeSlots.map((time) {
+                        final isSelected = _selectedTime == time;
+                        return ChoiceChip(
+                          showCheckmark: false,
+                          label: TextWidget(
+                            text: time,
+                            fontSize: fontSize + 1,
+                            color: isSelected ? plainWhite : textBlack,
+                            isBold: isSelected,
+                            fontFamily: 'Regular',
+                          ),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedTime = time;
+                                _selectedTableId = null;
+                              });
+                              _updateTableAvailability();
+                            }
+                          },
+                          backgroundColor: cloudWhite,
+                          selectedColor: AppTheme.primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(
+                              color:
+                                  isSelected ? AppTheme.primaryColor : ashGray,
+                              width: 1.5,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          elevation: isSelected ? 4 : 0,
+                          pressElevation: 6,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 20),
@@ -858,7 +927,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextWidget(
-                    text: 'Select Seat',
+                    text: 'Select Table',
                     fontSize: 24,
                     color: textBlack,
                     isBold: true,
@@ -866,144 +935,108 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     letterSpacing: 1,
                   ),
                   const SizedBox(height: 12),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: _firestore
-                        .collection('reservations')
-                        .where('date',
-                            isEqualTo:
-                                DateFormat('dd/MM/yyyy').format(_selectedDate))
-                        .where('time', isEqualTo: _selectedTime ?? '')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: TextWidget(
-                            text: 'Error: ${snapshot.error}',
-                            fontSize: fontSize,
-                            color: festiveRed,
-                            fontFamily: 'Regular',
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio:
+                                screenWidth * 0.25 / (screenWidth * 0.25),
                           ),
-                        );
-                      }
-                      if (!snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final reservedSeats = snapshot.data!.docs
-                          .map((doc) => {
-                                ...doc.data() as Map<String, dynamic>,
-                                'docId': doc.id
-                              })
-                          .toList();
-                      final seats = List<Map<String, dynamic>>.from(allSeats);
-                      for (var seat in seats) {
-                        final reserved = reservedSeats.firstWhere(
-                          (r) => r['seat'] == seat['seat'],
-                          orElse: () => {},
-                        );
-                        if (reserved.isNotEmpty) {
-                          seat['available'] = false;
-                          seat['reservation'] = reserved['reservation'];
-                          seat['docId'] = reserved['docId'];
-                        }
-                      }
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio:
-                              screenWidth * 0.25 / (screenWidth * 0.25),
-                        ),
-                        itemCount: seats.length,
-                        itemBuilder: (context, index) {
-                          final seat = seats[index];
-                          final isSelected = _selectedSeat == seat['seat'];
-                          final isAvailable = seat['available'] &&
-                              _numberOfGuests <= seat['capacity'];
-                          return Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                _showReservationDetails(context, seat);
-                                if (isAvailable && _selectedTime != null) {
-                                  setState(() {
-                                    _selectedSeat = seat['seat'];
-                                  });
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(15),
-                              child: Container(
-                                padding: EdgeInsets.all(padding),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  color: isAvailable
-                                      ? plainWhite
-                                      : ashGray.withOpacity(0.3),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppTheme.primaryColor
-                                        : isAvailable
-                                            ? palmGreen
-                                            : festiveRed,
-                                    width: 2,
+                          itemCount: _tables.length,
+                          itemBuilder: (context, index) {
+                            final table = _tables[index];
+                            final isSelected = _selectedTableId == table['id'];
+                            final isAvailable =
+                                _tableAvailability[table['id']] ??
+                                    true &&
+                                        _numberOfGuests <= table['capacity'];
+                            return Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  if (isAvailable && _selectedTime != null) {
+                                    setState(() {
+                                      _selectedTableId = table['id'];
+                                    });
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(15),
+                                child: Container(
+                                  padding: EdgeInsets.all(padding),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(15),
+                                    color: isAvailable
+                                        ? plainWhite
+                                        : ashGray.withOpacity(0.3),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppTheme.primaryColor
+                                          : isAvailable
+                                              ? palmGreen
+                                              : festiveRed,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      TextWidget(
+                                        text: table['name'],
+                                        fontSize: fontSize + 2,
+                                        color: isAvailable
+                                            ? textBlack
+                                            : charcoalGray,
+                                        isBold: true,
+                                        fontFamily: 'Bold',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextWidget(
+                                        text:
+                                            'Capacity: ${table['capacity']} guests',
+                                        fontSize: fontSize,
+                                        color: isAvailable
+                                            ? charcoalGray
+                                            : charcoalGray.withOpacity(0.6),
+                                        fontFamily: 'Regular',
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextWidget(
+                                        text: isAvailable
+                                            ? 'Available'
+                                            : 'Occupied',
+                                        fontSize: fontSize,
+                                        color: isAvailable
+                                            ? AppTheme.primaryColor
+                                            : charcoalGray,
+                                        isBold: true,
+                                        fontFamily: 'Bold',
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    TextWidget(
-                                      text: seat['seat'],
-                                      fontSize: fontSize + 2,
-                                      color: isAvailable
-                                          ? textBlack
-                                          : charcoalGray,
-                                      isBold: true,
-                                      fontFamily: 'Bold',
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextWidget(
-                                      text:
-                                          'Capacity: ${seat['capacity']} guests',
-                                      fontSize: fontSize,
-                                      color: isAvailable
-                                          ? charcoalGray
-                                          : charcoalGray.withOpacity(0.6),
-                                      fontFamily: 'Regular',
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextWidget(
-                                      text: isAvailable
-                                          ? 'Available'
-                                          : 'Occupied',
-                                      fontSize: fontSize,
-                                      color: isAvailable
-                                          ? AppTheme.primaryColor
-                                          : charcoalGray,
-                                      isBold: true,
-                                      fontFamily: 'Bold',
-                                    ),
-                                  ],
-                                ),
                               ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                            );
+                          },
+                        ),
                   const SizedBox(height: 20),
                   Center(
                     child: ButtonWidget(
                       label: 'Create Reservation',
-                      onPressed: _selectedTime != null && _selectedSeat != null
-                          ? () => _showCreateReservationDialog(context)
-                          : () {},
-                      color: _selectedTime != null && _selectedSeat != null
+                      onPressed:
+                          _selectedTime != null && _selectedTableId != null
+                              ? () => _showCreateReservationDialog(context)
+                              : () {},
+                      color: _selectedTime != null && _selectedTableId != null
                           ? AppTheme.primaryColor
                           : ashGray,
                       textColor: plainWhite,

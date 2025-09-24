@@ -171,6 +171,83 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     };
   }
 
+  Future<Map<String, dynamic>> _calculatePaymentBreakdown() async {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+
+    // Determine date range based on selected period
+    DateTime startDate, endDate;
+
+    if (_selectedDateRange != null) {
+      startDate = _selectedDateRange!.start;
+      endDate = _selectedDateRange!.end.add(Duration(days: 1));
+    } else {
+      switch (_selectedPeriod) {
+        case 'Daily':
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = DateTime(now.year, now.month, now.day + 1);
+          break;
+        case 'Weekly':
+          startDate = startOfWeek;
+          endDate = startOfWeek.add(Duration(days: 7));
+          break;
+        case 'Monthly':
+          startDate = DateTime(now.year, now.month, 1);
+          endDate = DateTime(now.year, now.month + 1, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = DateTime(now.year, now.month, now.day + 1);
+      }
+    }
+
+    // Get orders within the date range
+    final snapshot = await _firestore
+        .collection('orders')
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .get();
+
+    double cashTotal = 0.0;
+    double gcashTotal = 0.0;
+    int dineInCount = 0;
+    int pickupCount = 0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final total = (data['total'] as num).toDouble();
+      final paymentMethod = data['paymentMethod'] as String?;
+      final orderType = data['orderType'] as String?;
+
+      // Payment method breakdown
+      if (paymentMethod == 'Cash') {
+        cashTotal += total;
+      } else if (paymentMethod == 'GCash') {
+        gcashTotal += total;
+      }
+
+      // Order type breakdown
+      if (orderType == 'Dine-in') {
+        dineInCount++;
+      } else if (orderType == 'Pickup') {
+        pickupCount++;
+      }
+    }
+
+    return {
+      'paymentMethods': {
+        'Cash': cashTotal,
+        'GCash': gcashTotal,
+      },
+      'orderTypes': {
+        'Dine-in': dineInCount,
+        'Pickup': pickupCount,
+      },
+    };
+  }
+
   Future<List<Map<String, dynamic>>> _generateSalesReport() async {
     final snapshot = await _getReceiptsStream().first;
     final receipts = snapshot.docs
@@ -565,6 +642,101 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         amount: income['monthly']!,
                         icon: Icons.calendar_month,
                       ),
+                      const SizedBox(height: 12),
+                      FutureBuilder<Map<String, dynamic>>(
+                        future: _calculatePaymentBreakdown(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: TextWidget(
+                                text: 'Error: ${snapshot.error}',
+                                fontSize: 16,
+                                fontFamily: 'Regular',
+                                color: festiveRed,
+                              ),
+                            );
+                          }
+                          final breakdown = snapshot.data ??
+                              {
+                                'paymentMethods': {'Cash': 0.0, 'GCash': 0.0},
+                                'orderTypes': {'Dine-in': 0, 'Pickup': 0}
+                              };
+                          final paymentMethods = breakdown['paymentMethods']
+                              as Map<String, dynamic>;
+                          final orderTypes =
+                              breakdown['orderTypes'] as Map<String, dynamic>;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextWidget(
+                                text: 'Payment Breakdown',
+                                fontSize: 18,
+                                fontFamily: 'Bold',
+                                color: AppTheme.primaryColor,
+                                isBold: true,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildBreakdownCard(
+                                      title: 'Cash',
+                                      amount: paymentMethods['Cash'] as double,
+                                      icon: Icons.money,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildBreakdownCard(
+                                      title: 'GCash',
+                                      amount: paymentMethods['GCash'] as double,
+                                      icon: Icons.phone_android,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              TextWidget(
+                                text: 'Order Type Summary',
+                                fontSize: 18,
+                                fontFamily: 'Bold',
+                                color: AppTheme.primaryColor,
+                                isBold: true,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildOrderTypeCard(
+                                      title: 'Dine-in',
+                                      count: orderTypes['Dine-in'] as int,
+                                      icon: Icons.restaurant,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildOrderTypeCard(
+                                      title: 'Pickup',
+                                      count: orderTypes['Pickup'] as int,
+                                      icon: Icons.takeout_dining,
+                                      color: Colors.purple,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   );
                 },
@@ -793,6 +965,102 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   fontSize: 20,
                   fontFamily: 'Bold',
                   color: AppTheme.primaryColor,
+                  isBold: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBreakdownCard({
+    required String title,
+    required double amount,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: color.withOpacity(0.1),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  text: title,
+                  fontSize: 16,
+                  fontFamily: 'Medium',
+                  color: Colors.grey[800],
+                ),
+                TextWidget(
+                  text: 'P${amount.toStringAsFixed(2)}',
+                  fontSize: 20,
+                  fontFamily: 'Bold',
+                  color: color,
+                  isBold: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderTypeCard({
+    required String title,
+    required int count,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: color.withOpacity(0.1),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  text: title,
+                  fontSize: 16,
+                  fontFamily: 'Medium',
+                  color: Colors.grey[800],
+                ),
+                TextWidget(
+                  text: '$count orders',
+                  fontSize: 20,
+                  fontFamily: 'Bold',
+                  color: color,
                   isBold: true,
                 ),
               ],

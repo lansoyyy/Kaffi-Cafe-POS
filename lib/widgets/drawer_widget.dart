@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/main.dart';
 import 'package:kaffi_cafe_pos/screens/inventory_screen.dart';
 import 'package:kaffi_cafe_pos/screens/order_screen.dart';
@@ -9,6 +10,7 @@ import 'package:kaffi_cafe_pos/screens/settings_screen.dart';
 import 'package:kaffi_cafe_pos/screens/transaction_screen.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/branch_service.dart';
 import 'package:kaffi_cafe_pos/utils/role_service.dart';
 import 'package:kaffi_cafe_pos/widgets/divider_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
@@ -282,6 +284,23 @@ class _DrawerWidgetState extends State<DrawerWidget> {
                     await prefs.remove('current_staff_name');
                     await prefs.remove('current_staff_id');
                     await RoleService.clearUserRole();
+
+                    // Update branch isOnline status
+                    final currentBranch = BranchService.getSelectedBranch();
+
+                    print(currentBranch);
+                    if (currentBranch != null) {
+                      final FirebaseFirestore firestore =
+                          FirebaseFirestore.instance;
+                      await firestore
+                          .collection('branches')
+                          .doc(currentBranch == 'Kaffi Cafe - Eloisa St'
+                              ? 'branch1'
+                              : 'branch2')
+                          .update({
+                        'isOnline': false,
+                      });
+                    }
 
                     Navigator.pushReplacement(
                       context,

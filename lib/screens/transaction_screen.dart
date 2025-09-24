@@ -29,12 +29,31 @@ class _TransactionScreenState extends State<TransactionScreen> {
   DateTime? _selectedDay;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _currentBranch;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
     _getCurrentBranch();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearchQuery(Map<String, dynamic> transactionData) {
+    if (_searchQuery.isEmpty) return true;
+    final orderId = transactionData['orderId']?.toString().toLowerCase() ?? '';
+    return orderId.contains(_searchQuery.toLowerCase());
   }
 
   Future<void> _getCurrentBranch() async {
@@ -654,38 +673,86 @@ class _TransactionScreenState extends State<TransactionScreen> {
                   padding: const EdgeInsets.all(15.0),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextWidget(
-                            text:
-                                'Transactions for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
-                            fontSize: 18,
-                            fontFamily: 'Bold',
-                            color: AppTheme.primaryColor,
-                          ),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              ButtonWidget(
-                                width: 125,
-                                radius: 8,
+                              TextWidget(
+                                text:
+                                    'Transactions for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
+                                fontSize: 18,
+                                fontFamily: 'Bold',
                                 color: AppTheme.primaryColor,
-                                textColor: Colors.white,
-                                label: 'Print Summary',
-                                onPressed: _printTransactionSummary,
-                                fontSize: 12,
                               ),
-                              const SizedBox(width: 8),
-                              ButtonWidget(
-                                width: 125,
-                                radius: 8,
-                                color: AppTheme.primaryColor,
-                                textColor: Colors.white,
-                                label: 'Export CSV',
-                                onPressed: _exportToCSV,
-                                fontSize: 12,
+                              Row(
+                                children: [
+                                  ButtonWidget(
+                                    width: 125,
+                                    radius: 8,
+                                    color: AppTheme.primaryColor,
+                                    textColor: Colors.white,
+                                    label: 'Print Summary',
+                                    onPressed: _printTransactionSummary,
+                                    fontSize: 12,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ButtonWidget(
+                                    width: 125,
+                                    radius: 8,
+                                    color: AppTheme.primaryColor,
+                                    textColor: Colors.white,
+                                    label: 'Export CSV',
+                                    onPressed: _exportToCSV,
+                                    fontSize: 12,
+                                  ),
+                                ],
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search by Order ID...',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontFamily: 'Regular',
+                                  fontSize: 14,
+                                ),
+                                prefixIcon:
+                                    Icon(Icons.search, color: Colors.grey[500]),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.clear,
+                                            color: Colors.grey[500]),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                          });
+                                        },
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                              ),
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontFamily: 'Regular',
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -737,38 +804,34 @@ class _TransactionScreenState extends State<TransactionScreen> {
                               for (var order in orders) {
                                 final data =
                                     order.data() as Map<String, dynamic>;
-                                final items = data['items'] as List<dynamic>;
-                                for (var item in items) {
-                                  final category = item['category'] ?? 'Foods';
-                                  categorizedItems[category]!.add({
-                                    'name': item['name'],
-                                    'quantity': item['quantity'],
-                                    'price': item['price'],
-                                    'orderId': order.id,
-                                    'category': category,
-                                    // Added: Include full transaction data for details
-                                    'transactionData': data,
-                                  });
+                                // Apply search filter
+                                if (_matchesSearchQuery(data)) {
+                                  final items = data['items'] as List<dynamic>;
+                                  for (var item in items) {
+                                    final category =
+                                        item['category'] ?? 'Foods';
+                                    categorizedItems[category]!.add({
+                                      'name': item['name'],
+                                      'quantity': item['quantity'],
+                                      'price': item['price'],
+                                      'orderId': order.id,
+                                      'category': category,
+                                      // Added: Include full transaction data for details
+                                      'transactionData': data,
+                                    });
+                                  }
                                 }
                               }
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: categorizedItems.entries.map((entry) {
-                                  final category = entry.key;
                                   final items = entry.value;
                                   if (items.isEmpty) return const SizedBox();
                                   return Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      TextWidget(
-                                        text: category,
-                                        fontSize: 20,
-                                        fontFamily: 'Bold',
-                                        color: AppTheme.primaryColor,
-                                      ),
-                                      const SizedBox(height: 12),
                                       Table(
                                         border: TableBorder.all(
                                           color: AppTheme.primaryColor
@@ -777,10 +840,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                               BorderRadius.circular(8),
                                         ),
                                         columnWidths: const {
-                                          0: FlexColumnWidth(3),
-                                          1: FlexColumnWidth(2),
-                                          2: FlexColumnWidth(2),
-                                          3: FixedColumnWidth(60),
+                                          0: FlexColumnWidth(2), // Order ID
+                                          1: FlexColumnWidth(3), // Item
+                                          2: FlexColumnWidth(2), // Qty
+                                          3: FlexColumnWidth(2), // Price
+                                          4: FixedColumnWidth(60), // Actions
                                         },
                                         children: [
                                           _buildTableHeader(),
@@ -849,6 +913,15 @@ class _TransactionScreenState extends State<TransactionScreen> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextWidget(
+            text: 'Order ID',
+            fontSize: 16,
+            fontFamily: 'Bold',
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextWidget(
             text: 'Item',
             fontSize: 16,
             fontFamily: 'Bold',
@@ -894,6 +967,16 @@ class _TransactionScreenState extends State<TransactionScreen> {
       String orderId, Map<String, dynamic> transactionData) {
     return TableRow(
       children: [
+        // Added: Display order ID
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextWidget(
+            text: transactionData['orderId'] ?? orderId,
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.grey[800],
+          ),
+        ),
         // Modified: Wrap item name in GestureDetector to make it clickable
         GestureDetector(
           onTap: () => _showTransactionDetails(transactionData),

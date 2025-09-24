@@ -15,8 +15,8 @@ class _BranchSelectionScreenState extends State<BranchSelectionScreen> {
   String? _selectedBranch;
 
   final List<String> _branches = [
-    'Kaffi Cafe - Uptown',
-    'Kaffi Cafe - Downtown',
+    'Kaffi Cafe - Eloisa St',
+    'Kaffi Cafe - P.Noval',
   ];
 
   @override

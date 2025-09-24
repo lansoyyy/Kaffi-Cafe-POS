@@ -378,6 +378,19 @@ class _StaffScreenState extends State<StaffScreen> {
       await prefs.setString('current_staff_id', _selectedStaff);
       await RoleService.setUserRole(staffData['role'] ?? RoleService.staffRole);
 
+      // Update branch isOnline status
+      final currentBranch = BranchService.getSelectedBranch();
+      if (currentBranch != null) {
+        await _firestore
+            .collection('branches')
+            .doc(currentBranch == 'Kaffi Cafe - Eloisa St'
+                ? 'branch1'
+                : 'branch2')
+            .update({
+          'isOnline': true,
+        });
+      }
+
       if (mounted) {
         // Navigate to HomeScreen after successful login
         Navigator.pushReplacement(
@@ -428,6 +441,19 @@ class _StaffScreenState extends State<StaffScreen> {
       await prefs.setString('current_staff_id', 'super_admin');
       await RoleService.setUserRole(RoleService.superAdminRole);
 
+      // Update branch isOnline status
+      final currentBranch = BranchService.getSelectedBranch();
+      if (currentBranch != null) {
+        await _firestore
+            .collection('branches')
+            .doc(currentBranch == 'Kaffi Cafe - Eloisa St'
+                ? 'branch1'
+                : 'branch2')
+            .update({
+          'isOnline': true,
+        });
+      }
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -458,6 +484,18 @@ class _StaffScreenState extends State<StaffScreen> {
     await prefs.remove('current_staff_id');
     await RoleService.clearUserRole();
 
+    // Update branch isOnline status
+    final currentBranch = BranchService.getSelectedBranch();
+    if (currentBranch != null) {
+      await _firestore
+          .collection('branches')
+          .doc(
+              currentBranch == 'Kaffi Cafe - Eloisa St' ? 'branch1' : 'branch2')
+          .update({
+        'isOnline': false,
+      });
+    }
+
     _loginPinController.clear();
     _superAdminUsernameController.clear();
     _superAdminPinController.clear();
@@ -473,6 +511,18 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _changeBranch() async {
+    // Update current branch isOnline status to false
+    final currentBranch = BranchService.getSelectedBranch();
+    if (currentBranch != null) {
+      await _firestore
+          .collection('branches')
+          .doc(
+              currentBranch == 'Kaffi Cafe - Eloisa St' ? 'branch1' : 'branch2')
+          .update({
+        'isOnline': false,
+      });
+    }
+
     await BranchService.clearSelectedBranch();
 
     if (mounted) {
