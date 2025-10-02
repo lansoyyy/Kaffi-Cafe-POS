@@ -667,6 +667,797 @@ class _OrderScreenState extends State<OrderScreen> {
     );
   }
 
+  // Show pending order details dialog
+  void _showPendingOrderDialog(DocumentSnapshot order) {
+    final data = order.data() as Map<String, dynamic>;
+    final items =
+        (data['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.pending_actions,
+                        color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Pending Order Details',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${data['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Buyer: ${data['buyer']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text:
+                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    if (data['paymentMethod'] != null) ...[
+                      TextWidget(
+                        text: 'Payment Method: ${data['paymentMethod']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text: 'Items:',
+                      fontSize: 16,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: items.map<Widget>((item) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: item['name'],
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                  TextWidget(
+                                    text: 'x${item['quantity']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[700],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextWidget(
+                                    text:
+                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[800],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextWidget(
+                            text: 'Total:',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                          TextWidget(
+                            text: 'P${data['total'].toStringAsFixed(2)}',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.orange,
+                      textColor: Colors.white,
+                      label: 'Prepare Order',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _advanceOrderStatus(order.id, 'Pending');
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: AppTheme.primaryColor,
+                      textColor: Colors.white,
+                      label: 'Print Order',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateOrderPdf(data);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing order: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.grey[300]!,
+                      textColor: Colors.grey[700]!,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show preparing order details dialog
+  void _showPreparingOrderDialog(DocumentSnapshot order) {
+    final data = order.data() as Map<String, dynamic>;
+    final items =
+        (data['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.restaurant, color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Preparing Order Details',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${data['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Buyer: ${data['buyer']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text:
+                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    if (data['paymentMethod'] != null) ...[
+                      TextWidget(
+                        text: 'Payment Method: ${data['paymentMethod']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text: 'Items:',
+                      fontSize: 16,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: items.map<Widget>((item) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: item['name'],
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                  TextWidget(
+                                    text: 'x${item['quantity']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[700],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextWidget(
+                                    text:
+                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[800],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextWidget(
+                            text: 'Total:',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                          TextWidget(
+                            text: 'P${data['total'].toStringAsFixed(2)}',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.blue,
+                      textColor: Colors.white,
+                      label: 'Ready for Pickup',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _advanceOrderStatus(order.id, 'Accepted');
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: AppTheme.primaryColor,
+                      textColor: Colors.white,
+                      label: 'Print Order',
+                      onPressed: () async {
+                        try {
+                          final pdf = await _generateOrderPdf(data);
+                          await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save());
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: TextWidget(
+                                  text: 'Error printing order: $e',
+                                  fontSize: 14,
+                                  fontFamily: 'Regular',
+                                  color: Colors.white,
+                                ),
+                                backgroundColor: Colors.red[600],
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.grey[300]!,
+                      textColor: Colors.grey[700]!,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show ready for pickup order details dialog
+  void _showReadyOrderDialog(DocumentSnapshot order) {
+    final data = order.data() as Map<String, dynamic>;
+    final items =
+        (data['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Ready for Pickup Order Details',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${data['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Buyer: ${data['buyer']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text:
+                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    if (data['paymentMethod'] != null) ...[
+                      TextWidget(
+                        text: 'Payment Method: ${data['paymentMethod']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text: 'Items:',
+                      fontSize: 16,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: items.map<Widget>((item) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: item['name'],
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                  TextWidget(
+                                    text: 'x${item['quantity']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[700],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextWidget(
+                                    text:
+                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey[800],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextWidget(
+                            text: 'Total:',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                          TextWidget(
+                            text: 'P${data['total'].toStringAsFixed(2)}',
+                            fontSize: 16,
+                            fontFamily: 'Bold',
+                            color: Colors.grey[800],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.green,
+                      textColor: Colors.white,
+                      label: 'Order Received',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // Add docId to the data map for the success dialog
+                        final orderDataWithId = Map<String, dynamic>.from(data);
+                        orderDataWithId['docId'] = order.id;
+                        _showOrderReceivedSuccessDialog(orderDataWithId);
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.orange,
+                      textColor: Colors.white,
+                      label: 'Mark Unclaimed',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _deleteOrder(order.id);
+                      },
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.grey[300]!,
+                      textColor: Colors.grey[700]!,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      fontSize: 14,
+                      width: 140,
+                      height: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show order received success dialog
+  void _showOrderReceivedSuccessDialog(Map<String, dynamic> orderData) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 400,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.white, size: 48),
+                    const SizedBox(height: 12),
+                    TextWidget(
+                      text: 'Order Received Successfully!',
+                      fontSize: 20,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Order details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${orderData['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Buyer: ${orderData['buyer']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    TextWidget(
+                      text: 'Total: P${orderData['total'].toStringAsFixed(2)}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextWidget(
+                        text: 'Thank you for your order!',
+                        fontSize: 16,
+                        fontFamily: 'Medium',
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Close button
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: ButtonWidget(
+                  radius: 8,
+                  color: Colors.green,
+                  textColor: Colors.white,
+                  label: 'Close',
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // Update order status to completed
+                    _updateOrderStatus(orderData['docId'] ?? '', 'Completed');
+                  },
+                  fontSize: 14,
+                  width: 120,
+                  height: 40,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Update order status
   Future<void> _updateOrderStatus(String docId, String status) async {
     try {
@@ -721,7 +1512,7 @@ class _OrderScreenState extends State<OrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Order deleted successfully',
+            text: 'Order marked as unclaimed!',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
@@ -733,7 +1524,7 @@ class _OrderScreenState extends State<OrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Error deleting order: $e',
+            text: 'Error marking order as unclaimed: $e',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
@@ -900,19 +1691,33 @@ class _OrderScreenState extends State<OrderScreen> {
 
             // Filter orders and count by status
             final allOrders = snapshot.data!.docs;
-            final pendingOrders = allOrders.where((doc) {
+
+            // Apply search filter if there's a search query
+            List<DocumentSnapshot> searchFilteredOrders = allOrders;
+            if (_searchQuery.isNotEmpty) {
+              searchFilteredOrders = allOrders.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final orderId = data['orderId']?.toString().toLowerCase() ?? '';
+                final buyer = data['buyer']?.toString().toLowerCase() ?? '';
+                return orderId.contains(_searchQuery.toLowerCase()) ||
+                    buyer.contains(_searchQuery.toLowerCase());
+              }).toList();
+            }
+
+            // Filter by status after search filtering
+            final pendingOrders = searchFilteredOrders.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status'] ?? 'Pending';
               return status == 'Pending';
             }).toList();
 
-            final acceptedOrders = allOrders.where((doc) {
+            final acceptedOrders = searchFilteredOrders.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status'] ?? 'Pending';
               return status == 'Accepted';
             }).toList();
 
-            final readyOrders = allOrders.where((doc) {
+            final readyOrders = searchFilteredOrders.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status'] ?? 'Pending';
               return status == 'Ready to Pickup';
@@ -922,17 +1727,6 @@ class _OrderScreenState extends State<OrderScreen> {
               final data = doc.data() as Map<String, dynamic>;
               final status = data['status'] ?? 'Pending';
               return status == 'Completed';
-            }).toList();
-
-            final filteredOrders = allOrders.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final orderId = data['orderId']?.toString().toLowerCase() ?? '';
-              final buyer = data['buyer']?.toString().toLowerCase() ?? '';
-              final status = data['status'] ?? 'Pending';
-              // Filter out completed orders from display
-              if (status == 'Completed') return false;
-              return orderId.contains(_searchQuery) ||
-                  buyer.contains(_searchQuery);
             }).toList();
 
             return Column(
@@ -967,264 +1761,473 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Orders List
+                // Three Column Layout for Orders
                 Expanded(
-                  child: ListView.builder(
-                      itemCount: filteredOrders.length,
-                      itemBuilder: (context, index) {
-                        final order = filteredOrders[index];
-                        final data = order.data() as Map<String, dynamic>;
-                        final items = (data['items'] as List<dynamic>?)
-                                ?.cast<Map<String, dynamic>>() ??
-                            [];
-                        final status = data['status'] ?? 'Pending';
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.all(16.0),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Pending Orders Column
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    topRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.pending,
+                                      color: Colors.orange,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextWidget(
+                                      text: 'Pending Orders',
+                                      fontSize: 16,
+                                      fontFamily: 'Bold',
+                                      color: Colors.orange,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      TextWidget(
-                                        text:
-                                            'Order #${data['orderId'] ?? 'N/A'}',
-                                        fontSize: 18,
-                                        fontFamily: 'Bold',
-                                        color: Colors.grey[800],
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: _getStatusColor(
-                                                  _mapStatusToUI(status))
-                                              .withOpacity(0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: _getStatusColor(
-                                                _mapStatusToUI(status)),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: TextWidget(
-                                          text: _mapStatusToUI(status),
-                                          fontSize: 14,
-                                          fontFamily: 'Medium',
-                                          color: _getStatusColor(
-                                              _mapStatusToUI(status)),
-                                        ),
-                                      ),
-                                    ],
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: const BorderRadius.only(
+                                      bottomLeft: Radius.circular(12),
+                                      bottomRight: Radius.circular(12),
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.grey.withOpacity(0.2),
+                                      width: 1,
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  TextWidget(
-                                    text:
-                                        'Buyer: ${data['buyer'] ?? 'Unknown'}',
-                                    fontSize: 16,
-                                    fontFamily: 'Medium',
-                                    color: Colors.grey[700],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Divider(
-                                      color: Colors.grey, thickness: 0.5),
-                                  const SizedBox(height: 12),
-                                  // Order Items
-                                  Column(
-                                    children: items.map((item) {
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 8.0),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue[100],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: TextWidget(
-                                                text:
-                                                    'x${item['quantity'] ?? 1}',
-                                                fontSize: 14,
-                                                fontFamily: 'Bold',
-                                                color: Colors.blue[800],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: TextWidget(
-                                                text: item['name'] ??
-                                                    'Unknown Item',
-                                                fontSize: 16,
-                                                fontFamily: 'Regular',
-                                                color: Colors.grey[800],
-                                              ),
-                                            ),
-                                            TextWidget(
-                                              text:
-                                                  'P${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                              fontSize: 14,
-                                              fontFamily: 'Regular',
-                                              color: Colors.grey[600],
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Divider(
-                                      color: Colors.grey, thickness: 0.5),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      TextWidget(
-                                        text: 'Total',
-                                        fontSize: 16,
-                                        fontFamily: 'Bold',
-                                        color: Colors.grey[800],
-                                      ),
-                                      TextWidget(
-                                        text:
-                                            'P${(data['total'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                                        fontSize: 16,
-                                        fontFamily: 'Bold',
-                                        color: Colors.grey[800],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () => _deleteOrder(order.id),
-                                        icon: Icon(
-                                          Icons.delete,
-                                          color: Colors.red[400],
-                                          size: 26,
-                                        ),
-                                        tooltip: 'Delete Order',
-                                      ),
-                                      const SizedBox(width: 12),
-                                      if (status == 'Pending') ...[
-                                        ElevatedButton(
-                                          onPressed: () => _updateOrderStatus(
-                                              order.id, 'Declined'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red[400],
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(120, 48),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            elevation: 2,
-                                          ),
+                                  child: pendingOrders.isEmpty
+                                      ? Center(
                                           child: TextWidget(
-                                            text: 'Decline',
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: Colors.white,
+                                            text: 'No pending orders',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[500],
                                           ),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: pendingOrders.length,
+                                          itemBuilder: (context, index) {
+                                            final order = pendingOrders[index];
+                                            return _buildOrderCard(order);
+                                          },
                                         ),
-                                        const SizedBox(width: 12),
-                                        ElevatedButton(
-                                          onPressed: () => _advanceOrderStatus(
-                                              order.id, status),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green[600],
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(120, 48),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            elevation: 2,
-                                          ),
-                                          child: TextWidget(
-                                            text: 'Accept',
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ] else if (status == 'Accepted') ...[
-                                        ElevatedButton(
-                                          onPressed: () => _advanceOrderStatus(
-                                              order.id, status),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blue[600],
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(180, 48),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            elevation: 2,
-                                          ),
-                                          child: TextWidget(
-                                            text: 'Mark as Ready',
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ] else if (status ==
-                                          'Ready to Pickup') ...[
-                                        ElevatedButton(
-                                          onPressed: () => _advanceOrderStatus(
-                                              order.id, status),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green[600],
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(180, 48),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            elevation: 2,
-                                          ),
-                                          child: TextWidget(
-                                            text: 'Complete Order',
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        );
-                      }),
+                        ),
+                      ),
+                      // Preparing Orders Column
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    topRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.blue.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.restaurant,
+                                      color: Colors.blue,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextWidget(
+                                      text: 'Preparing Orders',
+                                      fontSize: 16,
+                                      fontFamily: 'Bold',
+                                      color: Colors.blue,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: const BorderRadius.only(
+                                      bottomLeft: Radius.circular(12),
+                                      bottomRight: Radius.circular(12),
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.grey.withOpacity(0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: acceptedOrders.isEmpty
+                                      ? Center(
+                                          child: TextWidget(
+                                            text: 'No orders preparing',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[500],
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: acceptedOrders.length,
+                                          itemBuilder: (context, index) {
+                                            final order = acceptedOrders[index];
+                                            return _buildOrderCard(order);
+                                          },
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Ready for Pickup Orders Column
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.only(left: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    topRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.green.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextWidget(
+                                      text: 'Ready for Pickup',
+                                      fontSize: 16,
+                                      fontFamily: 'Bold',
+                                      color: Colors.green,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: const BorderRadius.only(
+                                      bottomLeft: Radius.circular(12),
+                                      bottomRight: Radius.circular(12),
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.grey.withOpacity(0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: readyOrders.isEmpty
+                                      ? Center(
+                                          child: TextWidget(
+                                            text: 'No orders ready',
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[500],
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: readyOrders.length,
+                                          itemBuilder: (context, index) {
+                                            final order = readyOrders[index];
+                                            return _buildOrderCard(order);
+                                          },
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  // Build order card widget
+  Widget _buildOrderCard(DocumentSnapshot order) {
+    final data = order.data() as Map<String, dynamic>;
+    final items =
+        (data['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final status = data['status'] ?? 'Pending';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: InkWell(
+          onTap: () {
+            if (status == 'Pending') {
+              _showPendingOrderDialog(order);
+            } else if (status == 'Accepted') {
+              _showPreparingOrderDialog(order);
+            } else if (status == 'Ready to Pickup') {
+              _showReadyOrderDialog(order);
+            }
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.all(12.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: TextWidget(
+                        text: 'Order #${data['orderId'] ?? 'N/A'}',
+                        fontSize: 16,
+                        fontFamily: 'Bold',
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(_mapStatusToUI(status))
+                            .withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getStatusColor(_mapStatusToUI(status)),
+                          width: 1,
+                        ),
+                      ),
+                      child: TextWidget(
+                        text: _mapStatusToUI(status),
+                        fontSize: 12,
+                        fontFamily: 'Medium',
+                        color: _getStatusColor(_mapStatusToUI(status)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextWidget(
+                  text: 'Buyer: ${data['buyer'] ?? 'Unknown'}',
+                  fontSize: 14,
+                  fontFamily: 'Medium',
+                  color: Colors.grey[700],
+                ),
+                const SizedBox(height: 8),
+                const Divider(color: Colors.grey, thickness: 0.5),
+                const SizedBox(height: 8),
+                // Order Items
+                Column(
+                  children: items.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: TextWidget(
+                              text: 'x${item['quantity'] ?? 1}',
+                              fontSize: 12,
+                              fontFamily: 'Bold',
+                              color: Colors.blue[800],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextWidget(
+                              text: item['name'] ?? 'Unknown Item',
+                              fontSize: 14,
+                              fontFamily: 'Regular',
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                          TextWidget(
+                            text:
+                                'P${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                            fontSize: 12,
+                            fontFamily: 'Regular',
+                            color: Colors.grey[600],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8),
+                const Divider(color: Colors.grey, thickness: 0.5),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextWidget(
+                      text: 'Total',
+                      fontSize: 14,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                    TextWidget(
+                      text:
+                          'P${(data['total'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                      fontSize: 14,
+                      fontFamily: 'Bold',
+                      color: Colors.grey[800],
+                    ),
+                  ],
+                ),
+                // Only show action buttons for Ready to Pickup orders
+
+                // Show "Tap to view" hint for pending, preparing, and ready orders
+                if (status == 'Pending')
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          color: Colors.orange,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        TextWidget(
+                          text: 'Tap to view details',
+                          fontSize: 11,
+                          fontFamily: 'Medium',
+                          color: Colors.orange,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (status == 'Accepted')
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          color: Colors.blue,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        TextWidget(
+                          text: 'Tap to view details',
+                          fontSize: 11,
+                          fontFamily: 'Medium',
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (status == 'Ready to Pickup')
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          color: Colors.green,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        TextWidget(
+                          text: 'Tap to view details',
+                          fontSize: 11,
+                          fontFamily: 'Medium',
+                          color: Colors.green,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
