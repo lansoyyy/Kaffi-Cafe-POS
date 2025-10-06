@@ -9,6 +9,7 @@ import 'package:kaffi_cafe_pos/widgets/textfield_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/touchable_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kaffi_cafe_pos/screens/staff_screen.dart';
+import 'package:kaffi_cafe_pos/screens/notification_screen.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -1131,7 +1132,6 @@ class _HomeScreenState extends State<HomeScreen>
           StreamBuilder<QuerySnapshot>(
               stream: _firestore
                   .collection('orders')
-                  .where('status', isEqualTo: 'Pending')
                   .where('branch', isEqualTo: _currentBranch)
                   .snapshots(),
               builder: (context, snapshot) {
@@ -1158,16 +1158,27 @@ class _HomeScreenState extends State<HomeScreen>
                 }).toList();
                 return Padding(
                   padding: const EdgeInsets.only(right: 10),
-                  child: Badge(
-                    label: TextWidget(
-                      text: orders.length.toString(),
-                      fontSize: 12,
-                      color: Colors.white,
-                    ),
-                    child: Icon(
-                      Icons.notifications,
-                      color: Colors.white,
-                      size: 24,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(30),
+                    child: Badge(
+                      label: TextWidget(
+                        text: orders.length.toString(),
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
+                      child: Icon(
+                        Icons.notifications,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                 );

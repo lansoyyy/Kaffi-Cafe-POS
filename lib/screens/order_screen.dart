@@ -746,6 +746,48 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    // Display voucher information if available
+                    if (data['voucherCode'] != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.local_offer,
+                                color: Colors.green[700], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextWidget(
+                                    text:
+                                        'Voucher Applied: ${data['voucherCode']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Medium',
+                                    color: Colors.green[700],
+                                  ),
+                                  if (data['voucherDiscount'] != null)
+                                    TextWidget(
+                                      text:
+                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                      fontSize: 12,
+                                      fontFamily: 'Regular',
+                                      color: Colors.green[600],
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     const SizedBox(height: 16),
                     TextWidget(
                       text: 'Items:',
@@ -755,7 +797,7 @@ class _OrderScreenState extends State<OrderScreen> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
+                      constraints: const BoxConstraints(maxHeight: 300),
                       child: SingleChildScrollView(
                         child: Column(
                           children: items.map<Widget>((item) {
@@ -766,30 +808,61 @@ class _OrderScreenState extends State<OrderScreen> {
                                 color: Colors.grey[50],
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: TextWidget(
-                                      text: item['name'],
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextWidget(
+                                          text: item['name'],
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[800],
+                                        ),
+                                      ),
+                                      TextWidget(
+                                        text: 'x${item['quantity']}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[700],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      TextWidget(
+                                        text:
+                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[800],
+                                      ),
+                                    ],
+                                  ),
+                                  // Display customization details if available
+                                  if (item['customizations'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          TextWidget(
+                                            text: 'Customizations:',
+                                            fontSize: 12,
+                                            fontFamily: 'Medium',
+                                            color: Colors.blue[700],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          _buildCustomizationDetails(
+                                              item['customizations']),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  TextWidget(
-                                    text: 'x${item['quantity']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[700],
-                                  ),
-                                  const SizedBox(width: 16),
-                                  TextWidget(
-                                    text:
-                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[800],
-                                  ),
+                                  ],
                                 ],
                               ),
                             );
@@ -979,6 +1052,48 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    // Display voucher information if available
+                    if (data['voucherCode'] != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.local_offer,
+                                color: Colors.green[700], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextWidget(
+                                    text:
+                                        'Voucher Applied: ${data['voucherCode']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Medium',
+                                    color: Colors.green[700],
+                                  ),
+                                  if (data['voucherDiscount'] != null)
+                                    TextWidget(
+                                      text:
+                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                      fontSize: 12,
+                                      fontFamily: 'Regular',
+                                      color: Colors.green[600],
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     const SizedBox(height: 16),
                     TextWidget(
                       text: 'Items:',
@@ -988,7 +1103,7 @@ class _OrderScreenState extends State<OrderScreen> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
+                      constraints: const BoxConstraints(maxHeight: 300),
                       child: SingleChildScrollView(
                         child: Column(
                           children: items.map<Widget>((item) {
@@ -999,30 +1114,61 @@ class _OrderScreenState extends State<OrderScreen> {
                                 color: Colors.grey[50],
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: TextWidget(
-                                      text: item['name'],
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextWidget(
+                                          text: item['name'],
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[800],
+                                        ),
+                                      ),
+                                      TextWidget(
+                                        text: 'x${item['quantity']}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[700],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      TextWidget(
+                                        text:
+                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[800],
+                                      ),
+                                    ],
+                                  ),
+                                  // Display customization details if available
+                                  if (item['customizations'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          TextWidget(
+                                            text: 'Customizations:',
+                                            fontSize: 12,
+                                            fontFamily: 'Medium',
+                                            color: Colors.blue[700],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          _buildCustomizationDetails(
+                                              item['customizations']),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  TextWidget(
-                                    text: 'x${item['quantity']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[700],
-                                  ),
-                                  const SizedBox(width: 16),
-                                  TextWidget(
-                                    text:
-                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[800],
-                                  ),
+                                  ],
                                 ],
                               ),
                             );
@@ -1213,6 +1359,48 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    // Display voucher information if available
+                    if (data['voucherCode'] != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.local_offer,
+                                color: Colors.green[700], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextWidget(
+                                    text:
+                                        'Voucher Applied: ${data['voucherCode']}',
+                                    fontSize: 14,
+                                    fontFamily: 'Medium',
+                                    color: Colors.green[700],
+                                  ),
+                                  if (data['voucherDiscount'] != null)
+                                    TextWidget(
+                                      text:
+                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                      fontSize: 12,
+                                      fontFamily: 'Regular',
+                                      color: Colors.green[600],
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     const SizedBox(height: 16),
                     TextWidget(
                       text: 'Items:',
@@ -1222,7 +1410,7 @@ class _OrderScreenState extends State<OrderScreen> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
+                      constraints: const BoxConstraints(maxHeight: 300),
                       child: SingleChildScrollView(
                         child: Column(
                           children: items.map<Widget>((item) {
@@ -1233,30 +1421,61 @@ class _OrderScreenState extends State<OrderScreen> {
                                 color: Colors.grey[50],
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: TextWidget(
-                                      text: item['name'],
-                                      fontSize: 14,
-                                      fontFamily: 'Regular',
-                                      color: Colors.grey[800],
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextWidget(
+                                          text: item['name'],
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[800],
+                                        ),
+                                      ),
+                                      TextWidget(
+                                        text: 'x${item['quantity']}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[700],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      TextWidget(
+                                        text:
+                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                        fontSize: 14,
+                                        fontFamily: 'Regular',
+                                        color: Colors.grey[800],
+                                      ),
+                                    ],
+                                  ),
+                                  // Display customization details if available
+                                  if (item['customizations'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          TextWidget(
+                                            text: 'Customizations:',
+                                            fontSize: 12,
+                                            fontFamily: 'Medium',
+                                            color: Colors.blue[700],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          _buildCustomizationDetails(
+                                              item['customizations']),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  TextWidget(
-                                    text: 'x${item['quantity']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[700],
-                                  ),
-                                  const SizedBox(width: 16),
-                                  TextWidget(
-                                    text:
-                                        'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                    fontSize: 14,
-                                    fontFamily: 'Regular',
-                                    color: Colors.grey[800],
-                                  ),
+                                  ],
                                 ],
                               ),
                             );
@@ -2260,6 +2479,66 @@ class _OrderScreenState extends State<OrderScreen> {
           color: Colors.grey[700],
         ),
       ],
+    );
+  }
+
+  // Build customization details widget
+  Widget _buildCustomizationDetails(Map<String, dynamic> customizations) {
+    List<Widget> customizationWidgets = [];
+
+    customizations.forEach((key, value) {
+      if (value != null) {
+        String displayText = '';
+        switch (key) {
+          case 'espresso':
+            displayText = 'Espresso: $value';
+            break;
+          case 'addShot':
+            displayText = 'Extra Shot: ${value ? 'Yes' : 'No'}';
+            break;
+          case 'size':
+            displayText = 'Size: $value';
+            break;
+          case 'sweetness':
+            displayText = 'Sweetness: $value';
+            break;
+          case 'ice':
+            displayText = 'Ice: $value';
+            break;
+          default:
+            displayText = '$key: $value';
+        }
+
+        customizationWidgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_right,
+                  size: 12,
+                  color: Colors.blue[600],
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: TextWidget(
+                    text: displayText,
+                    fontSize: 11,
+                    fontFamily: 'Regular',
+                    color: Colors.blue[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: customizationWidgets,
     );
   }
 
