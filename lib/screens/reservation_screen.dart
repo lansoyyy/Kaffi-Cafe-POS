@@ -82,7 +82,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       final now = DateTime.now();
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
-          .where('reservation.status', isEqualTo: 'confirmed')
+          .where('status', isEqualTo: 'confirmed')
           .get();
 
       for (var doc in snapshot.docs) {
@@ -126,7 +126,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         if (now.difference(reservationDateTime).inHours >= 1) {
           // Update reservation status to expired
           await _firestore.collection('reservations').doc(doc.id).update({
-            'reservation.status': 'expired',
+            'status': 'expired',
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
@@ -204,19 +204,19 @@ class _ReservationScreenState extends State<ReservationScreen> {
   // Load table reservations for today
   Future<void> _loadTableReservations() async {
     try {
-      final today = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
-          .where('reservation.date', isEqualTo: today)
-          .where('reservation.status',
-              whereIn: ['confirmed', 'checked_in']).get();
+          .where('date', isEqualTo: today)
+          .where('status', whereIn: ['confirmed', 'checked_in']).get();
 
       Map<String, dynamic> reservations = {};
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final tableId = data['tableId'] as String;
+
         reservations[tableId] = {
-          ...data['reservation'],
+          ...data,
           'docId': doc.id,
         };
       }
@@ -272,19 +272,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
   Future<bool> _checkTableAvailability(
       String tableId, DateTime date, String time) async {
     try {
-      // Format date for Firestore query
-      String formattedDate =
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
       // Query reservations for the same date, time, and table
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
           .where('tableId', isEqualTo: tableId)
-          .where('reservation.date',
-              isEqualTo: DateFormat('dd/MM/yyyy').format(date))
-          .where('reservation.time', isEqualTo: time)
-          .where('reservation.status',
-              whereIn: ['confirmed', 'checked_in']).get();
+          .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(date))
+          .where('time', isEqualTo: time)
+          .where('status', whereIn: ['confirmed', 'checked_in']).get();
 
       // If no reservations found, table is available
       return snapshot.docs.isEmpty;
@@ -371,8 +365,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         backgroundColor: plainWhite,
         title: TextWidget(
-          text: table['name'] +
-              (table['available'] ? ' (Available)' : ' (Occupied)'),
+          text: 'Occupied',
           fontSize: fontSize + 4,
           color: textBlack,
           isBold: true,
@@ -391,7 +384,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TextWidget(
-                      text: 'Name: ${reservation['name']}',
+                      text: 'Customer: ${reservation['userEmail']}',
                       fontSize: fontSize + 2,
                       color: textBlack,
                       fontFamily: 'Regular',
@@ -450,7 +443,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       .collection('reservations')
                       .doc(table['docId'])
                       .update({
-                    'reservation.status': newStatus,
+                    'status': newStatus,
                     'updatedAt': FieldValue.serverTimestamp(),
                   });
                   Navigator.of(context).pop();
@@ -484,20 +477,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
               color: reservation['status'] == 'confirmed'
                   ? festiveRed
                   : AppTheme.primaryColor,
-              textColor: plainWhite,
-              fontSize: fontSize + 1,
-              height: 45,
-              width: 100,
-              radius: 10,
-            ),
-          if (reservation != null)
-            ButtonWidget(
-              label: 'Edit',
-              onPressed: () {
-                Navigator.of(context).pop();
-                _showEditReservationDialog(context, table);
-              },
-              color: AppTheme.primaryColor,
               textColor: plainWhite,
               fontSize: fontSize + 1,
               height: 45,
@@ -667,15 +646,14 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   'tableId': _selectedTableId,
                   'tableName': selectedTable['name'],
                   'capacity': selectedTable['capacity'],
-                  'reservation': {
-                    'name': _nameController.text,
-                    'date': DateFormat('dd/MM/yyyy').format(_selectedDate),
-                    'time': _selectedTime,
-                    'guests': _numberOfGuests,
-                    'order': _orderController.text,
-                    'status': 'confirmed',
-                    'source': 'POS', // Indicates reservation made via POS
-                  },
+
+                  'name': _nameController.text,
+                  'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
+                  'time': _selectedTime,
+                  'guests': _numberOfGuests,
+                  'order': _orderController.text,
+                  'status': 'confirmed',
+                  'source': 'POS', // Indicates reservation made via POS
                   'createdAt': FieldValue.serverTimestamp(),
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
@@ -857,9 +835,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
                     .collection('reservations')
                     .doc(table['docId'])
                     .update({
-                  'reservation.name': _nameController.text,
-                  'reservation.order': _orderController.text,
-                  'reservation.guests': _numberOfGuests,
+                  'name': _nameController.text,
+                  'order': _orderController.text,
+                  'guests': _numberOfGuests,
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
                 Navigator.of(context).pop();
@@ -1083,91 +1061,96 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         width: 2,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextWidget(
-                              text: table['name'],
-                              fontSize: fontSize + 2,
-                              color: isEnabled ? textBlack : charcoalGray,
-                              isBold: true,
-                              fontFamily: 'Bold',
-                            ),
-                            Icon(
-                              statusIcon,
-                              color: statusColor,
-                              size: fontSize * 1.5,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextWidget(
-                          text: 'Capacity: ${table['capacity']} guests',
-                          fontSize: fontSize,
-                          color: isEnabled
-                              ? charcoalGray
-                              : charcoalGray.withOpacity(0.6),
-                          fontFamily: 'Regular',
-                        ),
-                        const SizedBox(height: 8),
-                        TextWidget(
-                          text: 'Status: $status',
-                          fontSize: fontSize,
-                          color: statusColor,
-                          isBold: true,
-                          fontFamily: 'Bold',
-                        ),
-                        if (reservation != null) ...[
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextWidget(
+                                text: table['name'],
+                                fontSize: fontSize + 2,
+                                color: isEnabled ? textBlack : charcoalGray,
+                                isBold: true,
+                                fontFamily: 'Bold',
+                              ),
+                              Icon(
+                                statusIcon,
+                                color: statusColor,
+                                size: fontSize * 1.5,
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           TextWidget(
-                            text: 'Customer: ${reservation['name']}',
-                            fontSize: fontSize - 2,
-                            color: textBlack,
+                            text: 'Capacity: ${table['capacity']} guests',
+                            fontSize: fontSize,
+                            color: isEnabled
+                                ? charcoalGray
+                                : charcoalGray.withOpacity(0.6),
                             fontFamily: 'Regular',
                           ),
+                          const SizedBox(height: 8),
                           TextWidget(
-                            text: 'Time: ${reservation['time']}',
-                            fontSize: fontSize - 2,
-                            color: textBlack,
-                            fontFamily: 'Regular',
+                            text: 'Status: $status',
+                            fontSize: fontSize,
+                            color: statusColor,
+                            isBold: true,
+                            fontFamily: 'Bold',
                           ),
-                        ],
-                        const Spacer(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            ButtonWidget(
-                              label: isEnabled ? 'Disable' : 'Enable',
-                              onPressed: () => _toggleTableStatus(table['id']),
-                              color: isEnabled ? festiveRed : palmGreen,
-                              textColor: plainWhite,
+                          if (reservation != null) ...[
+                            const SizedBox(height: 8),
+                            TextWidget(
+                              text: 'Customer: ${reservation['userEmail']}',
                               fontSize: fontSize - 2,
-                              height: 35,
-                              radius: 8,
-                              width: 80,
+                              color: textBlack,
+                              fontFamily: 'Regular',
                             ),
-                            if (reservation != null)
+                            TextWidget(
+                              text: 'Time: ${reservation['time']}',
+                              fontSize: fontSize - 2,
+                              color: textBlack,
+                              fontFamily: 'Regular',
+                            ),
+                          ],
+                          SizedBox(
+                            height: 20,
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                               ButtonWidget(
-                                label: 'View',
+                                label: isEnabled ? 'Disable' : 'Enable',
                                 onPressed: () =>
-                                    _showReservationDetails(context, {
-                                  ...table,
-                                  'reservation': reservation,
-                                  'docId': reservation['docId'],
-                                }),
-                                color: AppTheme.primaryColor,
+                                    _toggleTableStatus(table['id']),
+                                color: isEnabled ? festiveRed : palmGreen,
                                 textColor: plainWhite,
                                 fontSize: fontSize - 2,
                                 height: 35,
                                 radius: 8,
-                                width: 60,
+                                width: 80,
                               ),
-                          ],
-                        ),
-                      ],
+                              if (reservation != null)
+                                ButtonWidget(
+                                  label: 'View',
+                                  onPressed: () =>
+                                      _showReservationDetails(context, {
+                                    ...table,
+                                    'reservation': reservation,
+                                    'docId': reservation['docId'],
+                                  }),
+                                  color: AppTheme.primaryColor,
+                                  textColor: plainWhite,
+                                  fontSize: fontSize - 2,
+                                  height: 35,
+                                  radius: 8,
+                                  width: 60,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

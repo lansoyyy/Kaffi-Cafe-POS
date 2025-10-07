@@ -23,6 +23,8 @@ class _OrderScreenState extends State<OrderScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _currentBranch;
+  List<DocumentSnapshot> _reservations = [];
+  bool _isLoadingReservations = false;
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _OrderScreenState extends State<OrderScreen> {
         _searchQuery = _searchController.text;
       });
     });
+    _fetchReservations();
   }
 
   Future<void> _getCurrentBranch() async {
@@ -41,6 +44,39 @@ class _OrderScreenState extends State<OrderScreen> {
       setState(() {
         _currentBranch = currentBranch;
       });
+    }
+  }
+
+  // Fetch reservations from Firestore
+  Future<void> _fetchReservations() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingReservations = true;
+      });
+    }
+
+    try {
+      final today = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      final QuerySnapshot snapshot = await _firestore
+          .collection('reservations')
+          .where('date', isEqualTo: today)
+          .where('status', whereIn: ['confirmed', 'checked_in'])
+          .orderBy('time')
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _reservations = snapshot.docs;
+          _isLoadingReservations = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching reservations: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingReservations = false;
+        });
+      }
     }
   }
 
@@ -684,290 +720,294 @@ class _OrderScreenState extends State<OrderScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.pending_actions,
-                        color: Colors.white, size: 32),
-                    const SizedBox(width: 12),
-                    TextWidget(
-                      text: 'Pending Order Details',
-                      fontSize: 24,
-                      fontFamily: 'Bold',
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-              // Order details
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextWidget(
-                      text: 'Order #${data['orderId']}',
-                      fontSize: 18,
-                      fontFamily: 'Bold',
-                      color: Colors.orange,
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text: 'Buyer: ${data['buyer']}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text:
-                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    if (data['paymentMethod'] != null) ...[
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.pending_actions,
+                          color: Colors.white, size: 32),
+                      const SizedBox(width: 12),
                       TextWidget(
-                        text: 'Payment Method: ${data['paymentMethod']}',
+                        text: 'Pending Order Details',
+                        fontSize: 24,
+                        fontFamily: 'Bold',
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                // Order details
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        text: 'Order #${data['orderId']}',
+                        fontSize: 18,
+                        fontFamily: 'Bold',
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(height: 8),
+                      TextWidget(
+                        text: 'Buyer: ${data['buyer']}',
                         fontSize: 14,
                         fontFamily: 'Regular',
                         color: Colors.grey[700],
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    // Display voucher information if available
-                    if (data['voucherCode'] != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Colors.green.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.local_offer,
-                                color: Colors.green[700], size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TextWidget(
-                                    text:
-                                        'Voucher Applied: ${data['voucherCode']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Medium',
-                                    color: Colors.green[700],
-                                  ),
-                                  if (data['voucherDiscount'] != null)
-                                    TextWidget(
-                                      text:
-                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
-                                      fontSize: 12,
-                                      fontFamily: 'Regular',
-                                      color: Colors.green[600],
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      TextWidget(
+                        text:
+                            'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    const SizedBox(height: 16),
-                    TextWidget(
-                      text: 'Items:',
-                      fontSize: 16,
-                      fontFamily: 'Bold',
-                      color: Colors.grey[800],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: items.map<Widget>((item) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(8),
+                      if (data['paymentMethod'] != null) ...[
+                        TextWidget(
+                          text: 'Payment Method: ${data['paymentMethod']}',
+                          fontSize: 14,
+                          fontFamily: 'Regular',
+                          color: Colors.grey[700],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Display voucher information if available
+                      if (data['voucherCode'] != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.local_offer,
+                                  color: Colors.green[700], size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextWidget(
+                                      text:
+                                          'Voucher Applied: ${data['voucherCode']}',
+                                      fontSize: 14,
+                                      fontFamily: 'Medium',
+                                      color: Colors.green[700],
+                                    ),
+                                    if (data['voucherDiscount'] != null)
+                                      TextWidget(
+                                        text:
+                                            'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                        fontSize: 12,
+                                        fontFamily: 'Regular',
+                                        color: Colors.green[600],
+                                      ),
+                                  ],
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextWidget(
-                                          text: item['name'],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 16),
+                      TextWidget(
+                        text: 'Items:',
+                        fontSize: 16,
+                        fontFamily: 'Bold',
+                        color: Colors.grey[800],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 300),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: items.map<Widget>((item) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextWidget(
+                                            text: item['name'],
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        TextWidget(
+                                          text: 'x${item['quantity']}',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[700],
+                                        ),
+                                        const SizedBox(width: 16),
+                                        TextWidget(
+                                          text:
+                                              'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
                                           fontSize: 14,
                                           fontFamily: 'Regular',
                                           color: Colors.grey[800],
                                         ),
-                                      ),
-                                      TextWidget(
-                                        text: 'x${item['quantity']}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[700],
-                                      ),
-                                      const SizedBox(width: 16),
-                                      TextWidget(
-                                        text:
-                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[800],
+                                      ],
+                                    ),
+                                    // Display customization details if available
+                                    if (item['customizations'] != null) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            TextWidget(
+                                              text: 'Customizations:',
+                                              fontSize: 12,
+                                              fontFamily: 'Medium',
+                                              color: Colors.blue[700],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            _buildCustomizationDetails(
+                                                item['customizations']),
+                                          ],
+                                        ),
                                       ),
                                     ],
-                                  ),
-                                  // Display customization details if available
-                                  if (item['customizations'] != null) ...[
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextWidget(
-                                            text: 'Customizations:',
-                                            fontSize: 12,
-                                            fontFamily: 'Medium',
-                                            color: Colors.blue[700],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          _buildCustomizationDetails(
-                                              item['customizations']),
-                                        ],
-                                      ),
-                                    ),
                                   ],
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Summary
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 16),
+                      // Summary
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextWidget(
+                              text: 'Total:',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                            TextWidget(
+                              text: 'P${data['total'].toStringAsFixed(2)}',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextWidget(
-                            text: 'Total:',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                          TextWidget(
-                            text: 'P${data['total'].toStringAsFixed(2)}',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                        ],
+                    ],
+                  ),
+                ),
+                // Action buttons
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.orange,
+                        textColor: Colors.white,
+                        label: 'Prepare Order',
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _advanceOrderStatus(order.id, 'Pending');
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              // Action buttons
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius:
-                      const BorderRadius.vertical(bottom: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.orange,
-                      textColor: Colors.white,
-                      label: 'Prepare Order',
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _advanceOrderStatus(order.id, 'Pending');
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: AppTheme.primaryColor,
-                      textColor: Colors.white,
-                      label: 'Print Order',
-                      onPressed: () async {
-                        try {
-                          final pdf = await _generateOrderPdf(data);
-                          await Printing.layoutPdf(
-                              onLayout: (PdfPageFormat format) async =>
-                                  pdf.save());
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: TextWidget(
-                                  text: 'Error printing order: $e',
-                                  fontSize: 14,
-                                  fontFamily: 'Regular',
-                                  color: Colors.white,
+                      ButtonWidget(
+                        radius: 8,
+                        color: AppTheme.primaryColor,
+                        textColor: Colors.white,
+                        label: 'Print Order',
+                        onPressed: () async {
+                          try {
+                            final pdf = await _generateOrderPdf(data);
+                            await Printing.layoutPdf(
+                                onLayout: (PdfPageFormat format) async =>
+                                    pdf.save());
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: TextWidget(
+                                    text: 'Error printing order: $e',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.white,
+                                  ),
+                                  backgroundColor: Colors.red[600],
                                 ),
-                                backgroundColor: Colors.red[600],
-                              ),
-                            );
+                              );
+                            }
                           }
-                        }
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.grey[300]!,
-                      textColor: Colors.grey[700]!,
-                      label: 'Close',
-                      onPressed: () => Navigator.pop(context),
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                  ],
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.grey[300]!,
+                        textColor: Colors.grey[700]!,
+                        label: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -991,289 +1031,294 @@ class _OrderScreenState extends State<OrderScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.restaurant, color: Colors.white, size: 32),
-                    const SizedBox(width: 12),
-                    TextWidget(
-                      text: 'Preparing Order Details',
-                      fontSize: 24,
-                      fontFamily: 'Bold',
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-              // Order details
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextWidget(
-                      text: 'Order #${data['orderId']}',
-                      fontSize: 18,
-                      fontFamily: 'Bold',
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text: 'Buyer: ${data['buyer']}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text:
-                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    if (data['paymentMethod'] != null) ...[
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.restaurant,
+                          color: Colors.white, size: 32),
+                      const SizedBox(width: 12),
                       TextWidget(
-                        text: 'Payment Method: ${data['paymentMethod']}',
+                        text: 'Preparing Order Details',
+                        fontSize: 24,
+                        fontFamily: 'Bold',
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                // Order details
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        text: 'Order #${data['orderId']}',
+                        fontSize: 18,
+                        fontFamily: 'Bold',
+                        color: Colors.blue,
+                      ),
+                      const SizedBox(height: 8),
+                      TextWidget(
+                        text: 'Buyer: ${data['buyer']}',
                         fontSize: 14,
                         fontFamily: 'Regular',
                         color: Colors.grey[700],
                       ),
+                      // const SizedBox(height: 8),
+                      // TextWidget(
+                      //   text:
+                      //       'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                      //   fontSize: 14,
+                      //   fontFamily: 'Regular',
+                      //   color: Colors.grey[700],
+                      // ),
                       const SizedBox(height: 8),
-                    ],
-                    // Display voucher information if available
-                    if (data['voucherCode'] != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Colors.green.withOpacity(0.3)),
+                      if (data['paymentMethod'] != null) ...[
+                        TextWidget(
+                          text: 'Payment Method: ${data['paymentMethod']}',
+                          fontSize: 14,
+                          fontFamily: 'Regular',
+                          color: Colors.grey[700],
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.local_offer,
-                                color: Colors.green[700], size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TextWidget(
-                                    text:
-                                        'Voucher Applied: ${data['voucherCode']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Medium',
-                                    color: Colors.green[700],
-                                  ),
-                                  if (data['voucherDiscount'] != null)
+                        const SizedBox(height: 8),
+                      ],
+                      // Display voucher information if available
+                      if (data['voucherCode'] != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.local_offer,
+                                  color: Colors.green[700], size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     TextWidget(
                                       text:
-                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
-                                      fontSize: 12,
-                                      fontFamily: 'Regular',
-                                      color: Colors.green[600],
+                                          'Voucher Applied: ${data['voucherCode']}',
+                                      fontSize: 14,
+                                      fontFamily: 'Medium',
+                                      color: Colors.green[700],
                                     ),
-                                ],
+                                    if (data['voucherDiscount'] != null)
+                                      TextWidget(
+                                        text:
+                                            'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                        fontSize: 12,
+                                        fontFamily: 'Regular',
+                                        color: Colors.green[600],
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 16),
+                      TextWidget(
+                        text: 'Items:',
+                        fontSize: 16,
+                        fontFamily: 'Bold',
+                        color: Colors.grey[800],
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    const SizedBox(height: 16),
-                    TextWidget(
-                      text: 'Items:',
-                      fontSize: 16,
-                      fontFamily: 'Bold',
-                      color: Colors.grey[800],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: items.map<Widget>((item) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextWidget(
-                                          text: item['name'],
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 300),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: items.map<Widget>((item) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextWidget(
+                                            text: item['name'],
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        TextWidget(
+                                          text: 'x${item['quantity']}',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[700],
+                                        ),
+                                        const SizedBox(width: 16),
+                                        TextWidget(
+                                          text:
+                                              'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
                                           fontSize: 14,
                                           fontFamily: 'Regular',
                                           color: Colors.grey[800],
                                         ),
-                                      ),
-                                      TextWidget(
-                                        text: 'x${item['quantity']}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[700],
-                                      ),
-                                      const SizedBox(width: 16),
-                                      TextWidget(
-                                        text:
-                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[800],
+                                      ],
+                                    ),
+                                    // Display customization details if available
+                                    if (item['customizations'] != null) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            TextWidget(
+                                              text: 'Customizations:',
+                                              fontSize: 12,
+                                              fontFamily: 'Medium',
+                                              color: Colors.blue[700],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            _buildCustomizationDetails(
+                                                item['customizations']),
+                                          ],
+                                        ),
                                       ),
                                     ],
-                                  ),
-                                  // Display customization details if available
-                                  if (item['customizations'] != null) ...[
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextWidget(
-                                            text: 'Customizations:',
-                                            fontSize: 12,
-                                            fontFamily: 'Medium',
-                                            color: Colors.blue[700],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          _buildCustomizationDetails(
-                                              item['customizations']),
-                                        ],
-                                      ),
-                                    ),
                                   ],
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Summary
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 16),
+                      // Summary
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextWidget(
+                              text: 'Total:',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                            TextWidget(
+                              text: 'P${data['total'].toStringAsFixed(2)}',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextWidget(
-                            text: 'Total:',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                          TextWidget(
-                            text: 'P${data['total'].toStringAsFixed(2)}',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                        ],
+                    ],
+                  ),
+                ),
+                // Action buttons
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.blue,
+                        textColor: Colors.white,
+                        label: 'Ready for Pickup',
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _advanceOrderStatus(order.id, 'Accepted');
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              // Action buttons
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius:
-                      const BorderRadius.vertical(bottom: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.blue,
-                      textColor: Colors.white,
-                      label: 'Ready for Pickup',
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _advanceOrderStatus(order.id, 'Accepted');
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: AppTheme.primaryColor,
-                      textColor: Colors.white,
-                      label: 'Print Order',
-                      onPressed: () async {
-                        try {
-                          final pdf = await _generateOrderPdf(data);
-                          await Printing.layoutPdf(
-                              onLayout: (PdfPageFormat format) async =>
-                                  pdf.save());
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: TextWidget(
-                                  text: 'Error printing order: $e',
-                                  fontSize: 14,
-                                  fontFamily: 'Regular',
-                                  color: Colors.white,
+                      ButtonWidget(
+                        radius: 8,
+                        color: AppTheme.primaryColor,
+                        textColor: Colors.white,
+                        label: 'Print Order',
+                        onPressed: () async {
+                          try {
+                            final pdf = await _generateOrderPdf(data);
+                            await Printing.layoutPdf(
+                                onLayout: (PdfPageFormat format) async =>
+                                    pdf.save());
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: TextWidget(
+                                    text: 'Error printing order: $e',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.white,
+                                  ),
+                                  backgroundColor: Colors.red[600],
                                 ),
-                                backgroundColor: Colors.red[600],
-                              ),
-                            );
+                              );
+                            }
                           }
-                        }
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.grey[300]!,
-                      textColor: Colors.grey[700]!,
-                      label: 'Close',
-                      onPressed: () => Navigator.pop(context),
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                  ],
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.grey[300]!,
+                        textColor: Colors.grey[700]!,
+                        label: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1297,275 +1342,280 @@ class _OrderScreenState extends State<OrderScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle,
-                        color: Colors.white, size: 32),
-                    const SizedBox(width: 12),
-                    TextWidget(
-                      text: 'Ready for Pickup Order Details',
-                      fontSize: 24,
-                      fontFamily: 'Bold',
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-              // Order details
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextWidget(
-                      text: 'Order #${data['orderId']}',
-                      fontSize: 18,
-                      fontFamily: 'Bold',
-                      color: Colors.green,
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text: 'Buyer: ${data['buyer']}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    TextWidget(
-                      text:
-                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
-                      fontSize: 14,
-                      fontFamily: 'Regular',
-                      color: Colors.grey[700],
-                    ),
-                    const SizedBox(height: 8),
-                    if (data['paymentMethod'] != null) ...[
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle,
+                          color: Colors.white, size: 32),
+                      const SizedBox(width: 12),
                       TextWidget(
-                        text: 'Payment Method: ${data['paymentMethod']}',
+                        text: 'Ready for Pickup Order Details',
+                        fontSize: 24,
+                        fontFamily: 'Bold',
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                // Order details
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        text: 'Order #${data['orderId']}',
+                        fontSize: 18,
+                        fontFamily: 'Bold',
+                        color: Colors.green,
+                      ),
+                      const SizedBox(height: 8),
+                      TextWidget(
+                        text: 'Buyer: ${data['buyer']}',
                         fontSize: 14,
                         fontFamily: 'Regular',
                         color: Colors.grey[700],
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    // Display voucher information if available
-                    if (data['voucherCode'] != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Colors.green.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.local_offer,
-                                color: Colors.green[700], size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TextWidget(
-                                    text:
-                                        'Voucher Applied: ${data['voucherCode']}',
-                                    fontSize: 14,
-                                    fontFamily: 'Medium',
-                                    color: Colors.green[700],
-                                  ),
-                                  if (data['voucherDiscount'] != null)
-                                    TextWidget(
-                                      text:
-                                          'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
-                                      fontSize: 12,
-                                      fontFamily: 'Regular',
-                                      color: Colors.green[600],
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      TextWidget(
+                        text:
+                            'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    const SizedBox(height: 16),
-                    TextWidget(
-                      text: 'Items:',
-                      fontSize: 16,
-                      fontFamily: 'Bold',
-                      color: Colors.grey[800],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: items.map<Widget>((item) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(8),
+                      if (data['paymentMethod'] != null) ...[
+                        TextWidget(
+                          text: 'Payment Method: ${data['paymentMethod']}',
+                          fontSize: 14,
+                          fontFamily: 'Regular',
+                          color: Colors.grey[700],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Display voucher information if available
+                      if (data['voucherCode'] != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.local_offer,
+                                  color: Colors.green[700], size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextWidget(
+                                      text:
+                                          'Voucher Applied: ${data['voucherCode']}',
+                                      fontSize: 14,
+                                      fontFamily: 'Medium',
+                                      color: Colors.green[700],
+                                    ),
+                                    if (data['voucherDiscount'] != null)
+                                      TextWidget(
+                                        text:
+                                            'Discount: P${data['voucherDiscount'].toStringAsFixed(2)}',
+                                        fontSize: 12,
+                                        fontFamily: 'Regular',
+                                        color: Colors.green[600],
+                                      ),
+                                  ],
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextWidget(
-                                          text: item['name'],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 16),
+                      TextWidget(
+                        text: 'Items:',
+                        fontSize: 16,
+                        fontFamily: 'Bold',
+                        color: Colors.grey[800],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 300),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: items.map<Widget>((item) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextWidget(
+                                            text: item['name'],
+                                            fontSize: 14,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        TextWidget(
+                                          text: 'x${item['quantity']}',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[700],
+                                        ),
+                                        const SizedBox(width: 16),
+                                        TextWidget(
+                                          text:
+                                              'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
                                           fontSize: 14,
                                           fontFamily: 'Regular',
                                           color: Colors.grey[800],
                                         ),
-                                      ),
-                                      TextWidget(
-                                        text: 'x${item['quantity']}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[700],
-                                      ),
-                                      const SizedBox(width: 16),
-                                      TextWidget(
-                                        text:
-                                            'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                                        fontSize: 14,
-                                        fontFamily: 'Regular',
-                                        color: Colors.grey[800],
+                                      ],
+                                    ),
+                                    // Display customization details if available
+                                    if (item['customizations'] != null) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            TextWidget(
+                                              text: 'Customizations:',
+                                              fontSize: 12,
+                                              fontFamily: 'Medium',
+                                              color: Colors.blue[700],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            _buildCustomizationDetails(
+                                                item['customizations']),
+                                          ],
+                                        ),
                                       ),
                                     ],
-                                  ),
-                                  // Display customization details if available
-                                  if (item['customizations'] != null) ...[
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TextWidget(
-                                            text: 'Customizations:',
-                                            fontSize: 12,
-                                            fontFamily: 'Medium',
-                                            color: Colors.blue[700],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          _buildCustomizationDetails(
-                                              item['customizations']),
-                                        ],
-                                      ),
-                                    ),
                                   ],
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Summary
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 16),
+                      // Summary
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextWidget(
+                              text: 'Total:',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                            TextWidget(
+                              text: 'P${data['total'].toStringAsFixed(2)}',
+                              fontSize: 16,
+                              fontFamily: 'Bold',
+                              color: Colors.grey[800],
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextWidget(
-                            text: 'Total:',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                          TextWidget(
-                            text: 'P${data['total'].toStringAsFixed(2)}',
-                            fontSize: 16,
-                            fontFamily: 'Bold',
-                            color: Colors.grey[800],
-                          ),
-                        ],
+                    ],
+                  ),
+                ),
+                // Action buttons
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.green,
+                        textColor: Colors.white,
+                        label: 'Order Received',
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Add docId to the data map for the success dialog
+                          final orderDataWithId =
+                              Map<String, dynamic>.from(data);
+                          orderDataWithId['docId'] = order.id;
+                          _showOrderReceivedSuccessDialog(orderDataWithId);
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
                       ),
-                    ),
-                  ],
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.orange,
+                        textColor: Colors.white,
+                        label: 'Mark Unclaimed',
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteOrder(order.id);
+                        },
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                      ButtonWidget(
+                        radius: 8,
+                        color: Colors.grey[300]!,
+                        textColor: Colors.grey[700]!,
+                        label: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        fontSize: 14,
+                        width: 140,
+                        height: 40,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // Action buttons
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius:
-                      const BorderRadius.vertical(bottom: Radius.circular(16)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.green,
-                      textColor: Colors.white,
-                      label: 'Order Received',
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Add docId to the data map for the success dialog
-                        final orderDataWithId = Map<String, dynamic>.from(data);
-                        orderDataWithId['docId'] = order.id;
-                        _showOrderReceivedSuccessDialog(orderDataWithId);
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.orange,
-                      textColor: Colors.white,
-                      label: 'Mark Unclaimed',
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _deleteOrder(order.id);
-                      },
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                    ButtonWidget(
-                      radius: 8,
-                      color: Colors.grey[300]!,
-                      textColor: Colors.grey[700]!,
-                      label: 'Close',
-                      onPressed: () => Navigator.pop(context),
-                      fontSize: 14,
-                      width: 140,
-                      height: 40,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1573,7 +1623,26 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   // Show order received success dialog
-  void _showOrderReceivedSuccessDialog(Map<String, dynamic> orderData) {
+  void _showOrderReceivedSuccessDialog(Map<String, dynamic> orderData) async {
+    print(
+        'Showing order received success dialog for order #${orderData['orderId']}');
+
+    // Check if this is a dine-in order with a reservation
+    final reservationData = await _fetchReservationDetails(orderData);
+
+    if (reservationData != null) {
+      print('Reservation found, showing reservation dialog');
+      // Show reservation dialog first
+      _showReservationDialog(orderData, reservationData);
+    } else {
+      print('No reservation found, showing regular order received dialog');
+      // Show regular order received dialog
+      _showRegularOrderReceivedDialog(orderData);
+    }
+  }
+
+  // Show regular order received dialog (for orders without reservations)
+  void _showRegularOrderReceivedDialog(Map<String, dynamic> orderData) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1590,7 +1659,8 @@ class _OrderScreenState extends State<OrderScreen> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.all(20),
+                width: double.infinity,
+                padding: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
                   color: Colors.green,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1668,6 +1738,388 @@ class _OrderScreenState extends State<OrderScreen> {
                   fontSize: 14,
                   width: 120,
                   height: 40,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Fetch reservation details associated with an order
+  Future<Map<String, dynamic>?> _fetchReservationDetails(
+      Map<String, dynamic> orderData) async {
+    try {
+      // Debug print to check order data
+      print('Order data for reservation check:');
+      print('Order Type: ${orderData['orderType']}');
+      print('Reservation Table ID: ${orderData['reservationTableId']}');
+      print('Reservation Date: ${orderData['reservationDate']}');
+      print('Reservation Time: ${orderData['reservationTime']}');
+
+      // Check if this is a dine-in order with reservation details
+      if (orderData['orderType'] == 'Dine in' &&
+          orderData['reservationTableId'] != null &&
+          orderData['reservationDate'] != null &&
+          orderData['reservationTime'] != null) {
+        print(
+            'Dine-in order with reservation details found. Querying reservations...');
+
+        // Convert date format from dd/MM/yyyy to yyyy-MM-dd to match Firestore format
+        String orderDate = orderData['reservationDate'].trim();
+        String formattedDate = orderDate; // Default to original format
+
+        try {
+          // Parse the date from dd/MM/yyyy format
+          final parts = orderDate.split('/');
+          if (parts.length == 3) {
+            final day = parts[0].padLeft(2, '0');
+            final month = parts[1].padLeft(2, '0');
+            final year = parts[2];
+            formattedDate = '$year-$month-$day';
+            print('Converted date from $orderDate to $formattedDate');
+          }
+        } catch (e) {
+          print('Error converting date format: $e');
+        }
+
+        // Query the reservations collection
+        final reservationQuery = await _firestore
+            .collection('reservations')
+            .where('tableId', isEqualTo: orderData['reservationTableId'])
+            .where('date', isEqualTo: formattedDate)
+            .where('time', isEqualTo: orderData['reservationTime'])
+            .limit(1) // Remove status filter to get any reservation
+            .get();
+
+        print('Found ${reservationQuery.docs.length} reservation documents');
+
+        if (reservationQuery.docs.isNotEmpty) {
+          final reservationDoc = reservationQuery.docs.first;
+          final reservationData = reservationDoc.data() as Map<String, dynamic>;
+
+          print('Reservation document data: $reservationData');
+
+          // Handle different possible structures
+          Map<String, dynamic>? reservation;
+          String? status;
+          String? customerName;
+
+          // Check if reservation data is nested under 'reservation' field
+          if (reservationData.containsKey('reservation') &&
+              reservationData['reservation'] != null) {
+            print('Reservation data is nested under "reservation" field');
+            reservation =
+                reservationData['reservation'] as Map<String, dynamic>;
+            status = reservation['status'];
+            customerName = reservation['name'];
+          }
+          // Check if reservation data is directly in the document
+          else {
+            print('Reservation data is nested under "reservation" fiasdeld');
+            reservation = reservationData;
+            status = reservationData['status'];
+            customerName = reservationData['name'];
+          }
+
+          print('Reservation status: $status');
+          print('Customer name: $customerName');
+
+          // Return reservation details with document ID
+          return {
+            'docId': reservationDoc.id,
+            'tableId': orderData['reservationTableId'],
+            'tableName': orderData['reservationTableName'] ?? 'Unknown Table',
+            'date': orderData['reservationDate'],
+            'time': orderData['reservationTime'],
+            'guests': orderData['reservationGuests'] ?? 1,
+            'status': status ?? 'unknown',
+            'customerName': customerName ?? 'Unknown Customer',
+          };
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching reservation details: $e');
+      return null;
+    }
+  }
+
+  // Update reservation status
+  Future<void> _updateReservationStatus(
+      String reservationDocId, String status) async {
+    try {
+      // First, get the reservation document to check its structure
+      final reservationDoc = await _firestore
+          .collection('reservations')
+          .doc(reservationDocId)
+          .get();
+      final reservationData = reservationDoc.data() as Map<String, dynamic>;
+
+      // Check if reservation data is nested under 'reservation' field
+      if (reservationData.containsKey('reservation') &&
+          reservationData['reservation'] != null) {
+        // Update nested structure
+        await _firestore
+            .collection('reservations')
+            .doc(reservationDocId)
+            .update({
+          'reservation.status': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'confirmedAt':
+              status == 'confirmed' ? FieldValue.serverTimestamp() : null,
+        });
+      }
+      // Check if reservation data is directly in the document
+      else {
+        // Update direct structure
+        await _firestore
+            .collection('reservations')
+            .doc(reservationDocId)
+            .update({
+          'status': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'confirmedAt':
+              status == 'confirmed' ? FieldValue.serverTimestamp() : null,
+        });
+      }
+
+      print('Reservation status updated to: $status');
+    } catch (e) {
+      print('Error updating reservation status: $e');
+    }
+  }
+
+  // Show reservation confirmation dialog
+  void _showReservationDialog(
+      Map<String, dynamic> orderData, Map<String, dynamic> reservationData) {
+    print(
+        'Showing reservation dialog for table ${reservationData['tableName']}');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent closing by tapping outside
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 500,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.event_seat, color: Colors.white, size: 32),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: 'Table Reservation',
+                      fontSize: 24,
+                      fontFamily: 'Bold',
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              // Reservation details
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order #${orderData['orderId']}',
+                      fontSize: 18,
+                      fontFamily: 'Bold',
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.table_restaurant,
+                                  color: Colors.blue[700], size: 20),
+                              const SizedBox(width: 8),
+                              TextWidget(
+                                text: 'Table: ${reservationData['tableName']}',
+                                fontSize: 16,
+                                fontFamily: 'Bold',
+                                color: Colors.blue[700],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.person,
+                                  color: Colors.grey[700], size: 20),
+                              const SizedBox(width: 8),
+                              TextWidget(
+                                text:
+                                    'Customer: ${reservationData['customerName']}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today,
+                                  color: Colors.grey[700], size: 20),
+                              const SizedBox(width: 8),
+                              TextWidget(
+                                text: 'Date: ${reservationData['date']}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.access_time,
+                                  color: Colors.grey[700], size: 20),
+                              const SizedBox(width: 8),
+                              TextWidget(
+                                text: 'Time: ${reservationData['time']}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.group,
+                                  color: Colors.grey[700], size: 20),
+                              const SizedBox(width: 8),
+                              TextWidget(
+                                text: 'Guests: ${reservationData['guests']}',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.grey[700],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextWidget(
+                      text:
+                          'Please confirm or reject the table reservation for this order.',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+                  ],
+                ),
+              ),
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ButtonWidget(
+                      radius: 8,
+                      color: Colors.red[600]!,
+                      textColor: Colors.white,
+                      label: 'Reject',
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _updateReservationStatus(
+                            reservationData['docId'], 'cancelled');
+
+                        // Continue with order completion
+                        await _updateOrderStatus(
+                            orderData['docId'] ?? '', 'Completed');
+
+                        // Check if context is still mounted before showing SnackBar
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: TextWidget(
+                                text:
+                                    'Reservation rejected and order completed',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.white,
+                              ),
+                              backgroundColor: Colors.red[600],
+                            ),
+                          );
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                    ButtonWidget(
+                      radius: 8,
+                      color: AppTheme.primaryColor,
+                      textColor: Colors.white,
+                      label: 'Confirm',
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _updateReservationStatus(
+                            reservationData['docId'], 'confirmed');
+
+                        // Continue with order completion
+                        await _updateOrderStatus(
+                            orderData['docId'] ?? '', 'Completed');
+
+                        // Check if context is still mounted before showing SnackBar
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: TextWidget(
+                                text:
+                                    'Reservation confirmed and order completed',
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: Colors.white,
+                              ),
+                              backgroundColor: AppTheme.primaryColor,
+                            ),
+                          );
+                        }
+                      },
+                      fontSize: 14,
+                      width: 120,
+                      height: 40,
+                    ),
+                  ],
                 ),
               ),
             ],
