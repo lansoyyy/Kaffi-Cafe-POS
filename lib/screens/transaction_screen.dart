@@ -398,24 +398,88 @@ class _TransactionScreenState extends State<TransactionScreen> {
           .orderBy('timestamp', descending: true)
           .get();
 
-      List<List<dynamic>> csvData = [
-        ['Order ID', 'Item', 'Quantity', 'Price', 'Date', 'Customer'],
-      ];
+      final now = DateTime.now();
+      final String reportDate =
+          DateFormat('MMMM dd, yyyy').format(_selectedDay!);
+      final String reportTime = DateFormat('hh:mm a').format(now);
+
+      // Calculate totals
+      int totalTransactions = snapshot.docs.length;
+      double totalAmount = 0.0;
+      int totalItems = 0;
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
+        totalAmount += data['totalAmount'] ?? 0;
         final items = data['items'] as List<dynamic>;
+        totalItems += items.length;
+      }
+
+      List<List<dynamic>> csvData = [
+        // Header section
+        ['KAFFI CAFE TRANSACTION REPORT'],
+        ['Branch: ${_currentBranch ?? 'Unknown'}'],
+        ['Report Date: $reportDate'],
+        [
+          'Generated on: ${DateFormat('MMMM dd, yyyy').format(now)} at $reportTime'
+        ],
+        ['Prepared by: Administrator'],
+        [],
+        // Summary section
+        ['TRANSACTION SUMMARY'],
+        ['Total Transactions', totalTransactions],
+        ['Total Items Sold', totalItems],
+        ['Total Revenue', '₱${totalAmount.toStringAsFixed(2)}'],
+        [],
+        // Transactions detail header
+        ['TRANSACTION DETAILS'],
+        [
+          'Order ID',
+          'Item',
+          'Quantity',
+          'Price',
+          'Subtotal',
+          'Date',
+          'Customer',
+          'Payment Method'
+        ],
+      ];
+
+      // Add transaction details
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>;
+        final orderDate =
+            DateFormat('MMM dd, yyyy HH:mm').format(data['timestamp'].toDate());
+        final customer = data['buyer'] ?? 'N/A';
+        final paymentMethod = data['paymentMethod'] ?? 'N/A';
+
         for (var item in items) {
+          final subtotal =
+              (item['price'] as double) * (item['quantity'] as int);
           csvData.add([
-            data['orderId'],
-            item['name'],
-            item['quantity'],
-            item['price'].toStringAsFixed(2),
-            DateFormat('MMM dd, yyyy HH:mm').format(data['timestamp'].toDate()),
-            data['buyer'],
+            data['orderId'] ?? '',
+            item['name'] ?? '',
+            item['quantity'] ?? 0,
+            '₱${(item['price'] as double).toStringAsFixed(2)}',
+            '₱${subtotal.toStringAsFixed(2)}',
+            orderDate,
+            customer,
+            paymentMethod,
           ]);
         }
       }
+
+      // Footer section
+      csvData.addAll([
+        [],
+        ['REPORT FOOTER'],
+        ['End of Report'],
+        ['This is a system-generated report'],
+        ['For inquiries, contact the cafe management'],
+        [],
+        ['Page 1 of 1'],
+      ]);
 
       final csvString = const ListToCsvConverter().convert(csvData);
       final bytes = utf8.encode(csvString);
@@ -423,9 +487,21 @@ class _TransactionScreenState extends State<TransactionScreen> {
       final url = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download',
-            'transactions_${DateFormat('yyyyMMdd').format(_selectedDay!)}.csv')
+            'kaffi_cafe_transactions_${DateFormat('yyyyMMdd').format(_selectedDay!)}.csv')
         ..click();
       html.Url.revokeObjectUrl(url);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Transaction report exported to CSV successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -458,44 +534,234 @@ class _TransactionScreenState extends State<TransactionScreen> {
           .orderBy('timestamp', descending: true)
           .get();
 
+      final now = DateTime.now();
+      final String reportDate =
+          DateFormat('MMMM dd, yyyy').format(_selectedDay!);
+      final String reportTime = DateFormat('hh:mm a').format(now);
+      final String generatedDate = DateFormat('MMMM dd, yyyy').format(now);
+
+      // Calculate totals
+      int totalTransactions = snapshot.docs.length;
+      double totalAmount = 0.0;
+      int totalItems = 0;
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        totalAmount += data['totalAmount'] ?? 0;
+        final items = data['items'] as List<dynamic>;
+        totalItems += items.length;
+      }
+
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
           build: (pw.Context context) {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                    'Transaction Summary - ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
-                    style: pw.TextStyle(
-                        fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 10),
-                ...snapshot.docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return pw.Column(
+                // Header
+                pw.Container(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text('KAFFI CAFE',
+                          style: pw.TextStyle(
+                              fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 5),
+                      pw.Text(_currentBranch ?? 'Unknown Branch',
+                          style: const pw.TextStyle(fontSize: 14)),
+                      pw.SizedBox(height: 5),
+                      pw.Text('TRANSACTION REPORT',
+                          style: pw.TextStyle(
+                              fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Date: $reportDate',
+                          style: const pw.TextStyle(fontSize: 12)),
+                      pw.Text('Generated: $generatedDate at $reportTime',
+                          style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 10),
+                      pw.Divider(thickness: 1),
+                    ],
+                  ),
+                ),
+
+                // Summary Section
+                pw.SizedBox(height: 20),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey300),
+                    borderRadius: pw.BorderRadius.circular(5),
+                  ),
+                  child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Order ID: ${data['orderId']}',
-                          style: const pw.TextStyle(fontSize: 12)),
-                      pw.Text('Customer: ${data['buyer']}',
-                          style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text(
-                          'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(data['timestamp'].toDate())}',
-                          style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('Items:',
+                      pw.Text('SUMMARY',
                           style: pw.TextStyle(
-                              fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                      ...data['items'].map<pw.Widget>((item) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                            child: pw.Text(
-                              '${item['name']} x${item['quantity']} - P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
-                              style: const pw.TextStyle(fontSize: 10),
-                            ),
-                          )),
+                              fontSize: 14, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 10),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('Total Transactions:'),
+                          pw.Text(totalTransactions.toString(),
+                              style:
+                                  pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('Total Items Sold:'),
+                          pw.Text(totalItems.toString(),
+                              style:
+                                  pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('Total Revenue:'),
+                          pw.Text('₱${totalAmount.toStringAsFixed(2)}',
+                              style:
+                                  pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
                     ],
-                  );
-                }).toList(),
+                  ),
+                ),
+
+                // Transaction Details
+                pw.SizedBox(height: 20),
+                pw.Text('TRANSACTION DETAILS',
+                    style: pw.TextStyle(
+                        fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 10),
+
+                pw.Expanded(
+                  child: pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey300),
+                    columnWidths: {
+                      0: const pw.FractionColumnWidth(0.15), // Order ID
+                      1: const pw.FractionColumnWidth(0.25), // Customer
+                      2: const pw.FractionColumnWidth(0.25), // Items
+                      3: const pw.FractionColumnWidth(0.15), // Time
+                      4: const pw.FractionColumnWidth(0.2), // Total
+                    },
+                    children: [
+                      // Table Header
+                      pw.TableRow(
+                        decoration:
+                            const pw.BoxDecoration(color: PdfColors.grey200),
+                        children: [
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('Order ID',
+                                style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10)),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('Customer',
+                                style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10)),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('Items',
+                                style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10)),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('Time',
+                                style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10)),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('Total',
+                                style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10)),
+                          ),
+                        ],
+                      ),
+                      // Table Rows
+                      ...snapshot.docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final items = data['items'] as List<dynamic>;
+                        final itemsText = items
+                                .map((item) =>
+                                    '${item['name']}(${item['quantity']})')
+                                .take(2)
+                                .join(', ') +
+                            (items.length > 2 ? '...' : '');
+
+                        return pw.TableRow(
+                          children: [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(5),
+                              child: pw.Text(data['orderId'] ?? '',
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(5),
+                              child: pw.Text(data['buyer'] ?? 'N/A',
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(5),
+                              child: pw.Text(itemsText,
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(5),
+                              child: pw.Text(
+                                  DateFormat('HH:mm')
+                                      .format(data['timestamp'].toDate()),
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(5),
+                              child: pw.Text(
+                                  '₱${data['totalAmount'].toStringAsFixed(2)}',
+                                  style: const pw.TextStyle(fontSize: 9)),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+
+                // Footer
+                pw.SizedBox(height: 20),
+                pw.Container(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Divider(thickness: 1),
+                      pw.SizedBox(height: 10),
+                      pw.Text('Prepared by: Administrator',
+                          style: pw.TextStyle(
+                              fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                      pw.SizedBox(height: 5),
+                      pw.Text('This is a system-generated report',
+                          style: const pw.TextStyle(fontSize: 8)),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Page 1 of 1',
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ],
+                  ),
+                ),
               ],
             );
           },
@@ -504,11 +770,416 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
       await Printing.layoutPdf(
           onLayout: (PdfPageFormat format) async => pdf.save());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Transaction report generated successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Error printing summary: $e',
+            text: 'Error generating report: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: festiveRed,
+        ),
+      );
+    }
+  }
+
+  // New method for monthly backup
+  Future<void> _printMonthlyTransactions() async {
+    final pdf = pw.Document();
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      final QuerySnapshot snapshot = await _firestore
+          .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final String reportMonth = DateFormat('MMMM yyyy').format(now);
+      final String reportTime = DateFormat('hh:mm a').format(now);
+      final String generatedDate = DateFormat('MMMM dd, yyyy').format(now);
+
+      // Calculate totals
+      int totalTransactions = snapshot.docs.length;
+      double totalAmount = 0.0;
+      int totalItems = 0;
+
+      // Group transactions by day
+      Map<String, List<Map<String, dynamic>>> dailyTransactions = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        totalAmount += data['totalAmount'] ?? 0;
+        final items = data['items'] as List<dynamic>;
+        totalItems += items.length;
+
+        final day = DateFormat('MMM dd').format(data['timestamp'].toDate());
+        if (!dailyTransactions.containsKey(day)) {
+          dailyTransactions[day] = [];
+        }
+        dailyTransactions[day]!.add(data);
+      }
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          header: (pw.Context context) {
+            return pw.Container(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text('KAFFI CAFE',
+                      style: pw.TextStyle(
+                          fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 5),
+                  pw.Text(_currentBranch ?? 'Unknown Branch',
+                      style: const pw.TextStyle(fontSize: 14)),
+                  pw.SizedBox(height: 5),
+                  pw.Text('MONTHLY TRANSACTION REPORT',
+                      style: pw.TextStyle(
+                          fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 5),
+                  pw.Text('Month: $reportMonth',
+                      style: const pw.TextStyle(fontSize: 12)),
+                  pw.Text('Generated: $generatedDate at $reportTime',
+                      style: const pw.TextStyle(fontSize: 10)),
+                  pw.SizedBox(height: 10),
+                  pw.Divider(thickness: 1),
+                ],
+              ),
+            );
+          },
+          footer: (pw.Context context) {
+            return pw.Container(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Divider(thickness: 1),
+                  pw.SizedBox(height: 10),
+                  pw.Text('Prepared by: Administrator',
+                      style: pw.TextStyle(
+                          fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                  pw.SizedBox(height: 5),
+                  pw.Text('This is a system-generated report',
+                      style: const pw.TextStyle(fontSize: 8)),
+                  pw.SizedBox(height: 5),
+                  pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
+                      style: const pw.TextStyle(fontSize: 8)),
+                ],
+              ),
+            );
+          },
+          build: (pw.Context context) {
+            return [
+              // Summary Section
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(5),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('MONTHLY SUMMARY',
+                        style: pw.TextStyle(
+                            fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 10),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Total Transactions:'),
+                        pw.Text(totalTransactions.toString(),
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                    pw.SizedBox(height: 5),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Total Items Sold:'),
+                        pw.Text(totalItems.toString(),
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                    pw.SizedBox(height: 5),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Total Revenue:'),
+                        pw.Text('₱${totalAmount.toStringAsFixed(2)}',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Daily Breakdown
+              pw.SizedBox(height: 20),
+              pw.Text('DAILY BREAKDOWN',
+                  style: pw.TextStyle(
+                      fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                columnWidths: {
+                  0: const pw.FractionColumnWidth(0.2), // Date
+                  1: const pw.FractionColumnWidth(0.2), // Transactions
+                  2: const pw.FractionColumnWidth(0.2), // Items
+                  3: const pw.FractionColumnWidth(0.4), // Revenue
+                },
+                children: [
+                  // Table Header
+                  pw.TableRow(
+                    decoration:
+                        const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Date',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Transactions',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Items',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Revenue',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                    ],
+                  ),
+                  // Table Rows
+                  ...dailyTransactions.entries.map((entry) {
+                    final dayTransactions = entry.value;
+                    int dayItems = 0;
+                    double dayRevenue = 0.0;
+
+                    for (var transaction in dayTransactions) {
+                      final data = transaction as Map<String, dynamic>;
+                      dayRevenue += data['totalAmount'] ?? 0;
+                      final items = data['items'] as List<dynamic>;
+                      dayItems += items.length;
+                    }
+
+                    return pw.TableRow(
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(entry.key,
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(dayTransactions.length.toString(),
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(dayItems.toString(),
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text('₱${dayRevenue.toStringAsFixed(2)}',
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdf.save());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Monthly transaction report generated successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error generating monthly report: $e',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: festiveRed,
+        ),
+      );
+    }
+  }
+
+  // New method for monthly CSV export
+  Future<void> _exportMonthlyToCSV() async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      final QuerySnapshot snapshot = await _firestore
+          .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final String reportMonth = DateFormat('MMMM yyyy').format(now);
+      final String reportTime = DateFormat('hh:mm a').format(now);
+
+      // Calculate totals
+      int totalTransactions = snapshot.docs.length;
+      double totalAmount = 0.0;
+      int totalItems = 0;
+
+      // Group transactions by day
+      Map<String, List<Map<String, dynamic>>> dailyTransactions = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        totalAmount += data['totalAmount'] ?? 0;
+        final items = data['items'] as List<dynamic>;
+        totalItems += items.length;
+
+        final day = DateFormat('MMM dd').format(data['timestamp'].toDate());
+        if (!dailyTransactions.containsKey(day)) {
+          dailyTransactions[day] = [];
+        }
+        dailyTransactions[day]!.add(data);
+      }
+
+      List<List<dynamic>> csvData = [
+        // Header section
+        ['KAFFI CAFE MONTHLY TRANSACTION REPORT'],
+        ['Branch: ${_currentBranch ?? 'Unknown'}'],
+        ['Report Month: $reportMonth'],
+        [
+          'Generated on: ${DateFormat('MMMM dd, yyyy').format(now)} at $reportTime'
+        ],
+        ['Prepared by: Administrator'],
+        [],
+        // Summary section
+        ['MONTHLY SUMMARY'],
+        ['Total Transactions', totalTransactions],
+        ['Total Items Sold', totalItems],
+        ['Total Revenue', '₱${totalAmount.toStringAsFixed(2)}'],
+        [],
+        // Daily breakdown header
+        ['DAILY BREAKDOWN'],
+        ['Date', 'Transactions', 'Items Sold', 'Revenue'],
+      ];
+
+      // Add daily breakdown
+      for (var entry in dailyTransactions.entries) {
+        final dayTransactions = entry.value;
+        int dayItems = 0;
+        double dayRevenue = 0.0;
+
+        for (var transaction in dayTransactions) {
+          final data = transaction as Map<String, dynamic>;
+          dayRevenue += data['totalAmount'] ?? 0;
+          final items = data['items'] as List<dynamic>;
+          dayItems += items.length;
+        }
+
+        csvData.add([
+          entry.key,
+          dayTransactions.length,
+          dayItems,
+          '₱${dayRevenue.toStringAsFixed(2)}',
+        ]);
+      }
+
+      // Footer section
+      csvData.addAll([
+        [],
+        ['REPORT FOOTER'],
+        ['End of Monthly Report'],
+        ['This is a system-generated report'],
+        ['For inquiries, contact the cafe management'],
+        [],
+        ['Page 1 of 1'],
+      ]);
+
+      final csvString = const ListToCsvConverter().convert(csvData);
+      final bytes = utf8.encode(csvString);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download',
+            'kaffi_cafe_monthly_transactions_${DateFormat('yyyyMM').format(now)}.csv')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Monthly transaction report exported to CSV successfully',
+            fontSize: 14,
+            fontFamily: 'Regular',
+            color: Colors.white,
+          ),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Error exporting monthly report to CSV: $e',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
@@ -679,13 +1350,6 @@ class _TransactionScreenState extends State<TransactionScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              TextWidget(
-                                text:
-                                    'Transactions for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
-                                fontSize: 18,
-                                fontFamily: 'Bold',
-                                color: AppTheme.primaryColor,
-                              ),
                               Row(
                                 children: [
                                   ButtonWidget(
@@ -709,7 +1373,41 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  ButtonWidget(
+                                    width: 125,
+                                    radius: 8,
+                                    color: Colors.green,
+                                    textColor: Colors.white,
+                                    label: 'Monthly PDF',
+                                    onPressed: _printMonthlyTransactions,
+                                    fontSize: 12,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ButtonWidget(
+                                    width: 125,
+                                    radius: 8,
+                                    color: Colors.green,
+                                    textColor: Colors.white,
+                                    label: 'Monthly CSV',
+                                    onPressed: _exportMonthlyToCSV,
+                                    fontSize: 12,
+                                  ),
+                                ],
+                              ),
                             ],
+                          ),
+                          SizedBox(
+                            height: 10,
+                          ),
+                          TextWidget(
+                            text:
+                                'Transactions for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)}',
+                            fontSize: 18,
+                            fontFamily: 'Bold',
+                            color: AppTheme.primaryColor,
                           ),
                           const SizedBox(height: 12),
                           Container(

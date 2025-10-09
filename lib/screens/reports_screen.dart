@@ -14,6 +14,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:csv/csv.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:fl_chart/fl_chart.dart';
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -324,6 +325,128 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     return report;
   }
 
+  // Methods for fetching chart data
+  Future<List<Map<String, dynamic>>> _getDailyIncomeData() async {
+    final now = DateTime.now();
+    final List<Map<String, dynamic>> dailyData = [];
+
+    // Get data for the last 7 days
+    for (int i = 6; i >= 0; i--) {
+      final date = DateTime(now.year, now.month, now.day - i);
+      final nextDate = date.add(Duration(days: 1));
+
+      final snapshot = await _firestore
+          .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
+          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(date))
+          .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(nextDate))
+          .get();
+
+      double totalIncome = 0.0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final total = (data['total'] as num).toDouble();
+        totalIncome += total;
+      }
+
+      dailyData.add({
+        'date': DateFormat('MMM dd').format(date),
+        'income': totalIncome,
+      });
+    }
+
+    return dailyData;
+  }
+
+  Future<List<Map<String, dynamic>>> _getMonthlyIncomeData() async {
+    final now = DateTime.now();
+    final List<Map<String, dynamic>> monthlyData = [];
+
+    // Get data for the last 6 months
+    for (int i = 5; i >= 0; i--) {
+      final month = DateTime(now.year, now.month - i, 1);
+      final nextMonth = DateTime(now.year, now.month - i + 1, 1);
+
+      final snapshot = await _firestore
+          .collection('orders')
+          .where('branch', isEqualTo: _currentBranch)
+          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(month))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(nextMonth))
+          .get();
+
+      double totalIncome = 0.0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final total = (data['total'] as num).toDouble();
+        totalIncome += total;
+      }
+
+      monthlyData.add({
+        'month': DateFormat('MMM yyyy').format(month),
+        'income': totalIncome,
+      });
+    }
+
+    return monthlyData;
+  }
+
+  Future<List<Map<String, dynamic>>> _getOrderTypeData() async {
+    final now = DateTime.now();
+    DateTime startDate, endDate;
+
+    if (_selectedDateRange != null) {
+      startDate = _selectedDateRange!.start;
+      endDate = _selectedDateRange!.end.add(Duration(days: 1));
+    } else {
+      switch (_selectedPeriod) {
+        case 'Daily':
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = DateTime(now.year, now.month, now.day + 1);
+          break;
+        case 'Weekly':
+          final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+          startDate = startOfWeek;
+          endDate = startOfWeek.add(Duration(days: 7));
+          break;
+        case 'Monthly':
+          startDate = DateTime(now.year, now.month, 1);
+          endDate = DateTime(now.year, now.month + 1, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = DateTime(now.year, now.month, now.day + 1);
+      }
+    }
+
+    final snapshot = await _firestore
+        .collection('orders')
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .get();
+
+    int dineInCount = 0;
+    int pickupCount = 0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final orderType = data['orderType'] as String?;
+
+      if (orderType == 'Dine-in') {
+        dineInCount++;
+      } else if (orderType == 'Pickup') {
+        pickupCount++;
+      }
+    }
+
+    return [
+      {'type': 'Dine-in', 'count': dineInCount},
+      {'type': 'Pickup', 'count': pickupCount},
+    ];
+  }
+
   void _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -581,347 +704,696 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           ],
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
           children: [
-            Expanded(
-              flex: 1,
-              child: FutureBuilder<Map<String, double>>(
-                future: _calculateIncome(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: TextWidget(
-                        text: 'Error: ${snapshot.error}',
-                        fontSize: 16,
-                        fontFamily: 'Regular',
-                        color: festiveRed,
-                      ),
-                    );
-                  }
-                  final income = snapshot.data ??
-                      {'daily': 0.0, 'weekly': 0.0, 'monthly': 0.0};
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextWidget(
-                        text: 'Income Summary',
-                        fontSize: 18,
-                        fontFamily: 'Bold',
-                        color: AppTheme.primaryColor,
-                        isBold: true,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
+            // Charts Section
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Daily/Monthly Income Chart
+                Expanded(
+                  flex: 1,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: _buildIncomeCard(
-                              title: 'Daily Income',
-                              amount: income['daily']!,
-                              icon: Icons.today,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildIncomeCard(
-                              title: 'Weekly Income',
-                              amount: income['weekly']!,
-                              icon: Icons.calendar_view_week,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildIncomeCard(
-                        title: 'Monthly Income',
-                        amount: income['monthly']!,
-                        icon: Icons.calendar_month,
-                      ),
-                      const SizedBox(height: 12),
-                      FutureBuilder<Map<String, dynamic>>(
-                        future: _calculatePaymentBreakdown(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: TextWidget(
-                                text: 'Error: ${snapshot.error}',
-                                fontSize: 16,
-                                fontFamily: 'Regular',
-                                color: festiveRed,
-                              ),
-                            );
-                          }
-                          final breakdown = snapshot.data ??
-                              {
-                                'paymentMethods': {'Cash': 0.0, 'GCash': 0.0},
-                                'orderTypes': {'Dine-in': 0, 'Pickup': 0}
-                              };
-                          final paymentMethods = breakdown['paymentMethods']
-                              as Map<String, dynamic>;
-                          final orderTypes =
-                              breakdown['orderTypes'] as Map<String, dynamic>;
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               TextWidget(
-                                text: 'Payment Breakdown',
+                                text: 'Income Trends',
                                 fontSize: 18,
                                 fontFamily: 'Bold',
                                 color: AppTheme.primaryColor,
                                 isBold: true,
                               ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildBreakdownCard(
-                                      title: 'Cash',
-                                      amount: paymentMethods['Cash'] as double,
-                                      icon: Icons.money,
-                                      color: Colors.green,
+                              DropdownButton<String>(
+                                value: _selectedPeriod == 'Daily' ||
+                                        _selectedPeriod == 'Weekly'
+                                    ? 'Daily'
+                                    : 'Monthly',
+                                items: ['Daily', 'Monthly'].map((period) {
+                                  return DropdownMenuItem(
+                                    value: period,
+                                    child: TextWidget(
+                                      text: period,
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: AppTheme.primaryColor,
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildBreakdownCard(
-                                      title: 'GCash',
-                                      amount: paymentMethods['GCash'] as double,
-                                      icon: Icons.phone_android,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              TextWidget(
-                                text: 'Order Type Summary',
-                                fontSize: 18,
-                                fontFamily: 'Bold',
-                                color: AppTheme.primaryColor,
-                                isBold: true,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildOrderTypeCard(
-                                      title: 'Dine-in',
-                                      count: orderTypes['Dine-in'] as int,
-                                      icon: Icons.restaurant,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildOrderTypeCard(
-                                      title: 'Pickup',
-                                      count: orderTypes['Pickup'] as int,
-                                      icon: Icons.takeout_dining,
-                                      color: Colors.purple,
-                                    ),
-                                  ),
-                                ],
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {});
+                                },
                               ),
                             ],
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 1,
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextWidget(
-                        text: 'Sales Report',
-                        fontSize: 18,
-                        fontFamily: 'Bold',
-                        color: AppTheme.primaryColor,
-                        isBold: true,
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: StreamBuilder<QuerySnapshot>(
-                          stream: _getReceiptsStream(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return Center(
-                                child: TextWidget(
-                                  text: 'Error: ${snapshot.error}',
-                                  fontSize: 16,
-                                  fontFamily: 'Regular',
-                                  color: festiveRed,
-                                ),
-                              );
-                            }
-                            if (!snapshot.hasData) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
-                            return FutureBuilder<List<Map<String, dynamic>>>(
-                              future: _generateSalesReport(),
-                              builder: (context, reportSnapshot) {
-                                if (reportSnapshot.connectionState ==
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 250,
+                            child: FutureBuilder<List<Map<String, dynamic>>>(
+                              future: _selectedPeriod == 'Daily' ||
+                                      _selectedPeriod == 'Weekly'
+                                  ? _getDailyIncomeData()
+                                  : _getMonthlyIncomeData(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
                                     ConnectionState.waiting) {
                                   return const Center(
                                       child: CircularProgressIndicator());
                                 }
-                                if (reportSnapshot.hasError) {
+                                if (snapshot.hasError) {
                                   return Center(
                                     child: TextWidget(
-                                      text: 'Error: ${reportSnapshot.error}',
+                                      text: 'Error: ${snapshot.error}',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: festiveRed,
+                                    ),
+                                  );
+                                }
+                                final data = snapshot.data ?? [];
+                                if (data.isEmpty) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'No data available',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                }
+                                return LineChart(
+                                  LineChartData(
+                                    gridData: FlGridData(
+                                      show: true,
+                                      drawVerticalLine: true,
+                                      getDrawingHorizontalLine: (value) {
+                                        return FlLine(
+                                          color: Colors.grey.withOpacity(0.3),
+                                          strokeWidth: 1,
+                                        );
+                                      },
+                                      getDrawingVerticalLine: (value) {
+                                        return FlLine(
+                                          color: Colors.grey.withOpacity(0.3),
+                                          strokeWidth: 1,
+                                        );
+                                      },
+                                    ),
+                                    titlesData: FlTitlesData(
+                                      show: true,
+                                      rightTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false)),
+                                      topTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false)),
+                                      bottomTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          reservedSize: 30,
+                                          interval: 1,
+                                          getTitlesWidget: (value, meta) {
+                                            if (value.toInt() >= 0 &&
+                                                value.toInt() < data.length) {
+                                              return SideTitleWidget(
+                                                axisSide: meta.axisSide,
+                                                child: TextWidget(
+                                                  text: data[value.toInt()]
+                                                      ['date'],
+                                                  fontSize: 10,
+                                                  fontFamily: 'Regular',
+                                                  color: Colors.grey[600],
+                                                ),
+                                              );
+                                            }
+                                            return const Text('');
+                                          },
+                                        ),
+                                      ),
+                                      leftTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          reservedSize: 42,
+                                          getTitlesWidget: (value, meta) {
+                                            return TextWidget(
+                                              text: 'P${value.toInt()}',
+                                              fontSize: 10,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[600],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    borderData: FlBorderData(
+                                      show: true,
+                                      border: Border.all(
+                                          color: Colors.grey.withOpacity(0.3)),
+                                    ),
+                                    minX: 0,
+                                    maxX: (data.length - 1).toDouble(),
+                                    minY: 0,
+                                    maxY: data.isNotEmpty
+                                        ? data
+                                                .map((item) =>
+                                                    item['income'] as double)
+                                                .reduce(
+                                                    (a, b) => a > b ? a : b) *
+                                            1.2
+                                        : 100,
+                                    lineBarsData: [
+                                      LineChartBarData(
+                                        spots:
+                                            data.asMap().entries.map((entry) {
+                                          return FlSpot(entry.key.toDouble(),
+                                              entry.value['income'] as double);
+                                        }).toList(),
+                                        isCurved: true,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppTheme.primaryColor
+                                                .withOpacity(0.8),
+                                            AppTheme.primaryColor,
+                                          ],
+                                        ),
+                                        barWidth: 3,
+                                        isStrokeCapRound: true,
+                                        dotData: FlDotData(
+                                          show: true,
+                                          getDotPainter:
+                                              (spot, percent, barData, index) {
+                                            return FlDotCirclePainter(
+                                              radius: 4,
+                                              color: AppTheme.primaryColor,
+                                              strokeWidth: 2,
+                                              strokeColor: Colors.white,
+                                            );
+                                          },
+                                        ),
+                                        belowBarData: BarAreaData(
+                                          show: true,
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppTheme.primaryColor
+                                                  .withOpacity(0.3),
+                                              AppTheme.primaryColor
+                                                  .withOpacity(0.1),
+                                            ],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Order Types Chart
+                Expanded(
+                  flex: 1,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextWidget(
+                            text: 'Order Types',
+                            fontSize: 18,
+                            fontFamily: 'Bold',
+                            color: AppTheme.primaryColor,
+                            isBold: true,
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 250,
+                            child: FutureBuilder<List<Map<String, dynamic>>>(
+                              future: _getOrderTypeData(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'Error: ${snapshot.error}',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: festiveRed,
+                                    ),
+                                  );
+                                }
+                                final data = snapshot.data ?? [];
+                                if (data.isEmpty ||
+                                    data.every((item) => item['count'] == 0)) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'No order data available',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                }
+                                return PieChart(
+                                  PieChartData(
+                                    sectionsSpace: 2,
+                                    centerSpaceRadius: 60,
+                                    sections: data.map((item) {
+                                      final color = item['type'] == 'Dine-in'
+                                          ? Colors.orange
+                                          : Colors.purple;
+                                      final count = item['count'] as int;
+                                      final total = data.fold(
+                                          0,
+                                          (sum, item) =>
+                                              sum + (item['count'] as int));
+                                      final percentage = total > 0
+                                          ? (count / total * 100)
+                                          : 0.0;
+
+                                      return PieChartSectionData(
+                                        color: color,
+                                        value: count.toDouble(),
+                                        title:
+                                            '${percentage.toStringAsFixed(1)}%',
+                                        radius: 50,
+                                        titleStyle: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                        badgeWidget: count > 0
+                                            ? _badge(
+                                                item['type'],
+                                                count,
+                                                color,
+                                              )
+                                            : null,
+                                        badgePositionPercentageOffset: .98,
+                                      );
+                                    }).toList(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildLegendItem('Dine-in', Colors.orange),
+                              const SizedBox(width: 20),
+                              _buildLegendItem('Pickup', Colors.purple),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Original Content
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: FutureBuilder<Map<String, double>>(
+                    future: _calculateIncome(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: TextWidget(
+                            text: 'Error: ${snapshot.error}',
+                            fontSize: 16,
+                            fontFamily: 'Regular',
+                            color: festiveRed,
+                          ),
+                        );
+                      }
+                      final income = snapshot.data ??
+                          {'daily': 0.0, 'weekly': 0.0, 'monthly': 0.0};
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextWidget(
+                            text: 'Income Summary',
+                            fontSize: 18,
+                            fontFamily: 'Bold',
+                            color: AppTheme.primaryColor,
+                            isBold: true,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildIncomeCard(
+                                  title: 'Daily Income',
+                                  amount: income['daily']!,
+                                  icon: Icons.today,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildIncomeCard(
+                                  title: 'Weekly Income',
+                                  amount: income['weekly']!,
+                                  icon: Icons.calendar_view_week,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildIncomeCard(
+                            title: 'Monthly Income',
+                            amount: income['monthly']!,
+                            icon: Icons.calendar_month,
+                          ),
+                          const SizedBox(height: 12),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _calculatePaymentBreakdown(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: TextWidget(
+                                    text: 'Error: ${snapshot.error}',
+                                    fontSize: 16,
+                                    fontFamily: 'Regular',
+                                    color: festiveRed,
+                                  ),
+                                );
+                              }
+                              final breakdown = snapshot.data ??
+                                  {
+                                    'paymentMethods': {
+                                      'Cash': 0.0,
+                                      'GCash': 0.0
+                                    },
+                                    'orderTypes': {'Dine-in': 0, 'Pickup': 0}
+                                  };
+                              final paymentMethods = breakdown['paymentMethods']
+                                  as Map<String, dynamic>;
+                              final orderTypes = breakdown['orderTypes']
+                                  as Map<String, dynamic>;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextWidget(
+                                    text: 'Payment Breakdown',
+                                    fontSize: 18,
+                                    fontFamily: 'Bold',
+                                    color: AppTheme.primaryColor,
+                                    isBold: true,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildBreakdownCard(
+                                          title: 'Cash',
+                                          amount:
+                                              paymentMethods['Cash'] as double,
+                                          icon: Icons.money,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildBreakdownCard(
+                                          title: 'GCash',
+                                          amount:
+                                              paymentMethods['GCash'] as double,
+                                          icon: Icons.phone_android,
+                                          color: Colors.blue,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextWidget(
+                                    text: 'Order Type Summary',
+                                    fontSize: 18,
+                                    fontFamily: 'Bold',
+                                    color: AppTheme.primaryColor,
+                                    isBold: true,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildOrderTypeCard(
+                                          title: 'Dine-in',
+                                          count: orderTypes['Dine-in'] as int,
+                                          icon: Icons.restaurant,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildOrderTypeCard(
+                                          title: 'Pickup',
+                                          count: orderTypes['Pickup'] as int,
+                                          icon: Icons.takeout_dining,
+                                          color: Colors.purple,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 1,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextWidget(
+                            text: 'Sales Report',
+                            fontSize: 18,
+                            fontFamily: 'Bold',
+                            color: AppTheme.primaryColor,
+                            isBold: true,
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 400,
+                            child: StreamBuilder<QuerySnapshot>(
+                              stream: _getReceiptsStream(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'Error: ${snapshot.error}',
                                       fontSize: 16,
                                       fontFamily: 'Regular',
                                       color: festiveRed,
                                     ),
                                   );
                                 }
-                                final salesReport = reportSnapshot.data ?? [];
-                                if (salesReport.isEmpty) {
-                                  return Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.receipt_long,
-                                          size: 64,
-                                          color: Colors.grey[400],
-                                        ),
-                                        SizedBox(height: 16),
-                                        TextWidget(
-                                          text: 'No sales data found',
-                                          fontSize: 18,
-                                          fontFamily: 'Medium',
-                                          color: Colors.grey[600],
-                                        ),
-                                        SizedBox(height: 8),
-                                        TextWidget(
-                                          text: 'Try adjusting the date range',
-                                          fontSize: 14,
-                                          fontFamily: 'Regular',
-                                          color: Colors.grey[500],
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                                if (!snapshot.hasData) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
                                 }
-                                return SingleChildScrollView(
-                                  child: DataTable(
-                                    columnSpacing: 16,
-                                    dataRowHeight: 60,
-                                    headingRowColor: WidgetStatePropertyAll(
-                                        AppTheme.primaryColor.withOpacity(0.1)),
-                                    columns: [
-                                      DataColumn(
-                                        label: TextWidget(
-                                          text: 'Date',
+                                return FutureBuilder<
+                                    List<Map<String, dynamic>>>(
+                                  future: _generateSalesReport(),
+                                  builder: (context, reportSnapshot) {
+                                    if (reportSnapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                          child: CircularProgressIndicator());
+                                    }
+                                    if (reportSnapshot.hasError) {
+                                      return Center(
+                                        child: TextWidget(
+                                          text:
+                                              'Error: ${reportSnapshot.error}',
                                           fontSize: 16,
-                                          fontFamily: 'Bold',
-                                          color: AppTheme.primaryColor,
+                                          fontFamily: 'Regular',
+                                          color: festiveRed,
                                         ),
-                                      ),
-                                      DataColumn(
-                                        label: TextWidget(
-                                          text: 'Total Sales (P)',
-                                          fontSize: 16,
-                                          fontFamily: 'Bold',
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: TextWidget(
-                                          text: 'Transactions',
-                                          fontSize: 16,
-                                          fontFamily: 'Bold',
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: TextWidget(
-                                          text: 'Avg. Transaction (P)',
-                                          fontSize: 16,
-                                          fontFamily: 'Bold',
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      ),
-                                    ],
-                                    rows: salesReport.map((report) {
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(
+                                      );
+                                    }
+                                    final salesReport =
+                                        reportSnapshot.data ?? [];
+                                    if (salesReport.isEmpty) {
+                                      return Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.receipt_long,
+                                              size: 64,
+                                              color: Colors.grey[400],
+                                            ),
+                                            SizedBox(height: 16),
                                             TextWidget(
-                                              text: report['date'],
+                                              text: 'No sales data found',
+                                              fontSize: 18,
+                                              fontFamily: 'Medium',
+                                              color: Colors.grey[600],
+                                            ),
+                                            SizedBox(height: 8),
+                                            TextWidget(
+                                              text:
+                                                  'Try adjusting the date range',
                                               fontSize: 14,
                                               fontFamily: 'Regular',
-                                              color: Colors.grey[800],
+                                              color: Colors.grey[500],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    return SingleChildScrollView(
+                                      child: DataTable(
+                                        columnSpacing: 16,
+                                        dataRowHeight: 60,
+                                        headingRowColor: WidgetStatePropertyAll(
+                                            AppTheme.primaryColor
+                                                .withOpacity(0.1)),
+                                        columns: [
+                                          DataColumn(
+                                            label: TextWidget(
+                                              text: 'Date',
+                                              fontSize: 16,
+                                              fontFamily: 'Bold',
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
-                                          DataCell(
-                                            TextWidget(
-                                              text: report['totalSales']
-                                                  .toStringAsFixed(2),
-                                              fontSize: 14,
-                                              fontFamily: 'Regular',
-                                              color: Colors.grey[800],
+                                          DataColumn(
+                                            label: TextWidget(
+                                              text: 'Total Sales (P)',
+                                              fontSize: 16,
+                                              fontFamily: 'Bold',
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
-                                          DataCell(
-                                            TextWidget(
-                                              text: report['transactions']
-                                                  .toString(),
-                                              fontSize: 14,
-                                              fontFamily: 'Regular',
-                                              color: Colors.grey[800],
+                                          DataColumn(
+                                            label: TextWidget(
+                                              text: 'Transactions',
+                                              fontSize: 16,
+                                              fontFamily: 'Bold',
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
-                                          DataCell(
-                                            TextWidget(
-                                              text: report['avgTransaction']
-                                                  .toStringAsFixed(2),
-                                              fontSize: 14,
-                                              fontFamily: 'Regular',
-                                              color: Colors.grey[800],
+                                          DataColumn(
+                                            label: TextWidget(
+                                              text: 'Avg. Transaction (P)',
+                                              fontSize: 16,
+                                              fontFamily: 'Bold',
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
                                         ],
-                                      );
-                                    }).toList(),
-                                  ),
+                                        rows: salesReport.map((report) {
+                                          return DataRow(
+                                            cells: [
+                                              DataCell(
+                                                TextWidget(
+                                                  text: report['date'],
+                                                  fontSize: 14,
+                                                  fontFamily: 'Regular',
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                              DataCell(
+                                                TextWidget(
+                                                  text: report['totalSales']
+                                                      .toStringAsFixed(2),
+                                                  fontSize: 14,
+                                                  fontFamily: 'Regular',
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                              DataCell(
+                                                TextWidget(
+                                                  text: report['transactions']
+                                                      .toString(),
+                                                  fontSize: 14,
+                                                  fontFamily: 'Regular',
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                              DataCell(
+                                                TextWidget(
+                                                  text: report['avgTransaction']
+                                                      .toStringAsFixed(2),
+                                                  fontSize: 14,
+                                                  fontFamily: 'Regular',
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }).toList(),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -1068,6 +1540,46 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // Helper widget for pie chart badges
+  Widget _badge(String text, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextWidget(
+        text: '$text ($count)',
+        fontSize: 12,
+        fontFamily: 'Medium',
+        color: Colors.white,
+      ),
+    );
+  }
+
+  // Helper widget for chart legend items
+  Widget _buildLegendItem(String text, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        TextWidget(
+          text: text,
+          fontSize: 14,
+          fontFamily: 'Regular',
+          color: Colors.grey[700],
+        ),
+      ],
     );
   }
 }
