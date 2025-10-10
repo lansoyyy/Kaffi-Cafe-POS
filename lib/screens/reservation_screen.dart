@@ -82,6 +82,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       final now = DateTime.now();
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('status', isEqualTo: 'confirmed')
           .get();
 
@@ -207,6 +208,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('date', isEqualTo: today)
           .where('status', whereIn: ['confirmed', 'checked_in']).get();
 
@@ -275,6 +277,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       // Query reservations for the same date, time, and table
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('tableId', isEqualTo: tableId)
           .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(date))
           .where('time', isEqualTo: time)

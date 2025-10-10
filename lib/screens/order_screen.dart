@@ -18,17 +18,20 @@ class OrderScreen extends StatefulWidget {
   _OrderScreenState createState() => _OrderScreenState();
 }
 
-class _OrderScreenState extends State<OrderScreen> {
+class _OrderScreenState extends State<OrderScreen>
+    with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _currentBranch;
   List<DocumentSnapshot> _reservations = [];
   bool _isLoadingReservations = false;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _getCurrentBranch();
     _searchController.addListener(() {
       setState(() {
@@ -87,6 +90,7 @@ class _OrderScreenState extends State<OrderScreen> {
     final quantityController = TextEditingController();
     final priceController = TextEditingController();
     final List<Map<String, dynamic>> items = [];
+    String selectedOrderType = 'Dine in'; // Default to Dine in
 
     showDialog(
       context: context,
@@ -162,6 +166,121 @@ class _OrderScreenState extends State<OrderScreen> {
                     borderSide:
                         BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Order Type Selection
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'Order Type',
+                      fontSize: 14,
+                      fontFamily: 'Medium',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                selectedOrderType = 'Dine in';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedOrderType == 'Dine in'
+                                    ? AppTheme.primaryColor.withOpacity(0.1)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: selectedOrderType == 'Dine in'
+                                      ? AppTheme.primaryColor
+                                      : Colors.grey[300]!,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.restaurant,
+                                    color: selectedOrderType == 'Dine in'
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey[600],
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  TextWidget(
+                                    text: 'Dine in',
+                                    fontSize: 14,
+                                    fontFamily: 'Medium',
+                                    color: selectedOrderType == 'Dine in'
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                selectedOrderType = 'Pickup';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedOrderType == 'Pickup'
+                                    ? AppTheme.primaryColor.withOpacity(0.1)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: selectedOrderType == 'Pickup'
+                                      ? AppTheme.primaryColor
+                                      : Colors.grey[300]!,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.takeout_dining,
+                                    color: selectedOrderType == 'Pickup'
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey[600],
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  TextWidget(
+                                    text: 'Pickup',
+                                    fontSize: 14,
+                                    fontFamily: 'Medium',
+                                    color: selectedOrderType == 'Pickup'
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -272,6 +391,7 @@ class _OrderScreenState extends State<OrderScreen> {
                   'status': 'Pending',
                   'timestamp': FieldValue.serverTimestamp(),
                   'branch': _currentBranch,
+                  'orderType': selectedOrderType,
                 });
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -953,10 +1073,21 @@ class _OrderScreenState extends State<OrderScreen> {
                         radius: 8,
                         color: Colors.orange,
                         textColor: Colors.white,
-                        label: 'Prepare Order',
+                        label: data['orderType'] == 'Dine in'
+                            ? 'Order Received'
+                            : 'Prepare Order',
                         onPressed: () {
                           Navigator.pop(context);
-                          _advanceOrderStatus(order.id, 'Pending');
+                          if (data['orderType'] == 'Dine in') {
+                            // For Dine in orders, show reservation dialog
+                            final orderDataWithId =
+                                Map<String, dynamic>.from(data);
+                            orderDataWithId['docId'] = order.id;
+                            _showOrderReceivedSuccessDialog(orderDataWithId);
+                          } else {
+                            // For Pickup orders, advance to preparing
+                            _advanceOrderStatus(order.id, 'Pending');
+                          }
                         },
                         fontSize: 14,
                         width: 140,
@@ -1575,14 +1706,11 @@ class _OrderScreenState extends State<OrderScreen> {
                         radius: 8,
                         color: Colors.green,
                         textColor: Colors.white,
-                        label: 'Order Received',
+                        label: 'Completed',
                         onPressed: () {
                           Navigator.pop(context);
-                          // Add docId to the data map for the success dialog
-                          final orderDataWithId =
-                              Map<String, dynamic>.from(data);
-                          orderDataWithId['docId'] = order.id;
-                          _showOrderReceivedSuccessDialog(orderDataWithId);
+                          // For Ready for Pickup orders, just mark as completed
+                          _updateOrderStatus(order.id, 'Completed');
                         },
                         fontSize: 14,
                         width: 140,
@@ -1627,18 +1755,24 @@ class _OrderScreenState extends State<OrderScreen> {
     print(
         'Showing order received success dialog for order #${orderData['orderId']}');
 
-    // Check if this is a dine-in order with a reservation
-    final reservationData = await _fetchReservationDetails(orderData);
+    // For Dine in orders from Pending status, check for reservation
+    if (orderData['orderType'] == 'Dine in' &&
+        orderData['status'] == 'Pending') {
+      // Check if this is a dine-in order with a reservation
+      final reservationData = await _fetchReservationDetails(orderData);
 
-    if (reservationData != null) {
-      print('Reservation found, showing reservation dialog');
-      // Show reservation dialog first
-      _showReservationDialog(orderData, reservationData);
-    } else {
-      print('No reservation found, showing regular order received dialog');
-      // Show regular order received dialog
-      _showRegularOrderReceivedDialog(orderData);
+      if (reservationData != null) {
+        print('Reservation found, showing reservation dialog');
+        // Show reservation dialog first
+        _showReservationDialog(orderData, reservationData);
+        return;
+      }
     }
+
+    print(
+        'No reservation found or not a Dine in pending order, showing regular order received dialog');
+    // Show regular order received dialog
+    _showRegularOrderReceivedDialog(orderData);
   }
 
   // Show regular order received dialog (for orders without reservations)
@@ -2097,7 +2231,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
                         // Continue with order completion
                         await _updateOrderStatus(
-                            orderData['docId'] ?? '', 'Completed');
+                            orderData['docId'] ?? '', 'Accepted');
 
                         // Check if context is still mounted before showing SnackBar
                         if (mounted) {
@@ -2337,338 +2471,399 @@ class _OrderScreenState extends State<OrderScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: _firestore
-              .collection('orders')
-              .where('branch', isEqualTo: _currentBranch)
-              .orderBy('timestamp', descending: true)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: TextWidget(
-                  text: 'Error: ${snapshot.error}',
-                  fontSize: 16,
-                  fontFamily: 'Regular',
-                  color: Colors.red[600],
-                ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            // Filter orders and count by status
-            final allOrders = snapshot.data!.docs;
-
-            // Apply search filter if there's a search query
-            List<DocumentSnapshot> searchFilteredOrders = allOrders;
-            if (_searchQuery.isNotEmpty) {
-              searchFilteredOrders = allOrders.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final orderId = data['orderId']?.toString().toLowerCase() ?? '';
-                final buyer = data['buyer']?.toString().toLowerCase() ?? '';
-                return orderId.contains(_searchQuery.toLowerCase()) ||
-                    buyer.contains(_searchQuery.toLowerCase());
-              }).toList();
-            }
-
-            // Filter by status after search filtering
-            final pendingOrders = searchFilteredOrders.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status'] ?? 'Pending';
-              return status == 'Pending';
-            }).toList();
-
-            final acceptedOrders = searchFilteredOrders.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status'] ?? 'Pending';
-              return status == 'Accepted';
-            }).toList();
-
-            final readyOrders = searchFilteredOrders.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status'] ?? 'Pending';
-              return status == 'Ready to Pickup';
-            }).toList();
-
-            final completedOrders = allOrders.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status'] ?? 'Pending';
-              return status == 'Completed';
-            }).toList();
-
-            return Column(
-              children: [
-                // Status Counts Section
-                Container(
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatusCountCard(
-                          'On Hold', pendingOrders.length, Colors.orange),
-                      _buildStatusCountCard(
-                          'Preparing', acceptedOrders.length, Colors.blue),
-                      _buildStatusCountCard(
-                          'Ready', readyOrders.length, Colors.green),
-                      _buildStatusCountCard(
-                          'Completed', completedOrders.length, Colors.grey),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Three Column Layout for Orders
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Pending Orders Column
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.1),
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    topRight: Radius.circular(12),
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.orange.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.pending,
-                                      color: Colors.orange,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    TextWidget(
-                                      text: 'Pending Orders',
-                                      fontSize: 16,
-                                      fontFamily: 'Bold',
-                                      color: Colors.orange,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.all(8.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: const BorderRadius.only(
-                                      bottomLeft: Radius.circular(12),
-                                      bottomRight: Radius.circular(12),
-                                    ),
-                                    border: Border.all(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: pendingOrders.isEmpty
-                                      ? Center(
-                                          child: TextWidget(
-                                            text: 'No pending orders',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[500],
-                                          ),
-                                        )
-                                      : ListView.builder(
-                                          itemCount: pendingOrders.length,
-                                          itemBuilder: (context, index) {
-                                            final order = pendingOrders[index];
-                                            return _buildOrderCard(order);
-                                          },
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Preparing Orders Column
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    topRight: Radius.circular(12),
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.blue.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.restaurant,
-                                      color: Colors.blue,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    TextWidget(
-                                      text: 'Preparing Orders',
-                                      fontSize: 16,
-                                      fontFamily: 'Bold',
-                                      color: Colors.blue,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.all(8.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: const BorderRadius.only(
-                                      bottomLeft: Radius.circular(12),
-                                      bottomRight: Radius.circular(12),
-                                    ),
-                                    border: Border.all(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: acceptedOrders.isEmpty
-                                      ? Center(
-                                          child: TextWidget(
-                                            text: 'No orders preparing',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[500],
-                                          ),
-                                        )
-                                      : ListView.builder(
-                                          itemCount: acceptedOrders.length,
-                                          itemBuilder: (context, index) {
-                                            final order = acceptedOrders[index];
-                                            return _buildOrderCard(order);
-                                          },
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Ready for Pickup Orders Column
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    topRight: Radius.circular(12),
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.green.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    TextWidget(
-                                      text: 'Ready for Pickup',
-                                      fontSize: 16,
-                                      fontFamily: 'Bold',
-                                      color: Colors.green,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.all(8.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: const BorderRadius.only(
-                                      bottomLeft: Radius.circular(12),
-                                      bottomRight: Radius.circular(12),
-                                    ),
-                                    border: Border.all(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: readyOrders.isEmpty
-                                      ? Center(
-                                          child: TextWidget(
-                                            text: 'No orders ready',
-                                            fontSize: 14,
-                                            fontFamily: 'Regular',
-                                            color: Colors.grey[500],
-                                          ),
-                                        )
-                                      : ListView.builder(
-                                          itemCount: readyOrders.length,
-                                          itemBuilder: (context, index) {
-                                            final order = readyOrders[index];
-                                            return _buildOrderCard(order);
-                                          },
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      body: Column(
+        children: [
+          // Tab bar for Dine in and Pickup
+          Container(
+            margin: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
                 ),
               ],
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppTheme.primaryColor,
+              labelColor: AppTheme.primaryColor,
+              unselectedLabelColor: Colors.grey[600],
+              labelStyle: const TextStyle(
+                fontSize: 16,
+                fontFamily: 'Bold',
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 16,
+                fontFamily: 'Medium',
+              ),
+              tabs: const [
+                Tab(
+                  icon: Icon(Icons.restaurant),
+                  text: 'Dine in',
+                ),
+                Tab(
+                  icon: Icon(Icons.takeout_dining),
+                  text: 'Pickup',
+                ),
+              ],
+            ),
+          ),
+          // Tab bar view
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Dine in orders tab
+                _buildOrdersTab('Dine in'),
+                // Pickup orders tab
+                _buildOrdersTab('Pickup'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build orders tab for specific order type
+  Widget _buildOrdersTab(String orderType) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: _firestore
+            .collection('orders')
+            .where('branch', isEqualTo: _currentBranch)
+            .where('orderType', isEqualTo: orderType)
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: TextWidget(
+                text: 'Error: ${snapshot.error}',
+                fontSize: 16,
+                fontFamily: 'Regular',
+                color: Colors.red[600],
+              ),
             );
-          },
-        ),
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Filter orders and count by status
+          final allOrders = snapshot.data!.docs;
+
+          // Apply search filter if there's a search query
+          List<DocumentSnapshot> searchFilteredOrders = allOrders;
+          if (_searchQuery.isNotEmpty) {
+            searchFilteredOrders = allOrders.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final orderId = data['orderId']?.toString().toLowerCase() ?? '';
+              final buyer = data['buyer']?.toString().toLowerCase() ?? '';
+              return orderId.contains(_searchQuery.toLowerCase()) ||
+                  buyer.contains(_searchQuery.toLowerCase());
+            }).toList();
+          }
+
+          // Filter by status after search filtering
+          final pendingOrders = searchFilteredOrders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? 'Pending';
+            return status == 'Pending';
+          }).toList();
+
+          final acceptedOrders = searchFilteredOrders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? 'Pending';
+            return status == 'Accepted';
+          }).toList();
+
+          final readyOrders = searchFilteredOrders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? 'Pending';
+            return status == 'Ready to Pickup';
+          }).toList();
+
+          final completedOrders = allOrders.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? 'Pending';
+            return status == 'Completed';
+          }).toList();
+
+          return Column(
+            children: [
+              // Status Counts Section
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStatusCountCard(
+                        'On Hold', pendingOrders.length, Colors.orange),
+                    _buildStatusCountCard(
+                        'Preparing', acceptedOrders.length, Colors.blue),
+                    _buildStatusCountCard(
+                        'Ready', readyOrders.length, Colors.green),
+                    _buildStatusCountCard(
+                        'Completed', completedOrders.length, Colors.grey),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Three Column Layout for Orders
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Pending Orders Column
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  topRight: Radius.circular(12),
+                                ),
+                                border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.pending,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextWidget(
+                                    text: 'Pending Orders',
+                                    fontSize: 16,
+                                    fontFamily: 'Bold',
+                                    color: Colors.orange,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(12),
+                                    bottomRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: pendingOrders.isEmpty
+                                    ? Center(
+                                        child: TextWidget(
+                                          text: 'No pending orders',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[500],
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: pendingOrders.length,
+                                        itemBuilder: (context, index) {
+                                          final order = pendingOrders[index];
+                                          return _buildOrderCard(order);
+                                        },
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Preparing Orders Column
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  topRight: Radius.circular(12),
+                                ),
+                                border: Border.all(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.restaurant,
+                                    color: Colors.blue,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextWidget(
+                                    text: 'Preparing Orders',
+                                    fontSize: 16,
+                                    fontFamily: 'Bold',
+                                    color: Colors.blue,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(12),
+                                    bottomRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: acceptedOrders.isEmpty
+                                    ? Center(
+                                        child: TextWidget(
+                                          text: 'No orders preparing',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[500],
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: acceptedOrders.length,
+                                        itemBuilder: (context, index) {
+                                          final order = acceptedOrders[index];
+                                          return _buildOrderCard(order);
+                                        },
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Ready for Pickup Orders Column
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  topRight: Radius.circular(12),
+                                ),
+                                border: Border.all(
+                                  color: Colors.green.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextWidget(
+                                    text: 'Ready for Pickup',
+                                    fontSize: 16,
+                                    fontFamily: 'Bold',
+                                    color: Colors.green,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(12),
+                                    bottomRight: Radius.circular(12),
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: readyOrders.isEmpty
+                                    ? Center(
+                                        child: TextWidget(
+                                          text: 'No orders ready',
+                                          fontSize: 14,
+                                          fontFamily: 'Regular',
+                                          color: Colors.grey[500],
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: readyOrders.length,
+                                        itemBuilder: (context, index) {
+                                          final order = readyOrders[index];
+                                          return _buildOrderCard(order);
+                                        },
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2740,11 +2935,54 @@ class _OrderScreenState extends State<OrderScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                TextWidget(
-                  text: 'Buyer: ${data['buyer'] ?? 'Unknown'}',
-                  fontSize: 14,
-                  fontFamily: 'Medium',
-                  color: Colors.grey[700],
+                Row(
+                  children: [
+                    TextWidget(
+                      text: 'Buyer: ${data['buyer'] ?? 'Unknown'}',
+                      fontSize: 14,
+                      fontFamily: 'Medium',
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: data['orderType'] == 'Dine in'
+                            ? Colors.blue.withOpacity(0.1)
+                            : Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: data['orderType'] == 'Dine in'
+                              ? Colors.blue.withOpacity(0.3)
+                              : Colors.green.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            data['orderType'] == 'Dine in'
+                                ? Icons.restaurant
+                                : Icons.takeout_dining,
+                            size: 14,
+                            color: data['orderType'] == 'Dine in'
+                                ? Colors.blue[700]
+                                : Colors.green[700],
+                          ),
+                          const SizedBox(width: 4),
+                          TextWidget(
+                            text: data['orderType'] ?? 'Unknown',
+                            fontSize: 12,
+                            fontFamily: 'Medium',
+                            color: data['orderType'] == 'Dine in'
+                                ? Colors.blue[700]
+                                : Colors.green[700],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 const Divider(color: Colors.grey, thickness: 0.5),
@@ -2997,6 +3235,7 @@ class _OrderScreenState extends State<OrderScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 }
