@@ -307,14 +307,26 @@ class _ReservationScreenState extends State<ReservationScreen> {
     {'id': 'table5', 'name': 'Table 5', 'capacity': 4},
   ];
 
-  // Generate available time slots based on operating hours (7:00 AM - 11:00 PM)
-  // Format: 7:00 AM - 7:55 AM (55 mins reservation, 5 mins cleaning)
+  // Generate available time slots based on operating hours (10:00 AM - 2:00 AM)
+  // Format: 10:00 AM - 10:55 AM (55 mins reservation, 5 mins cleaning)
   void _generateTimeSlots() {
     final now = DateTime.now();
     final List<String> slots = [];
 
-    // Operating hours: 7:00 AM to 10:00 PM (last slot 10:00-10:55 PM)
-    for (int hour = 7; hour <= 22; hour++) {
+    // Operating hours: 10:00 AM to 2:00 AM (next day)
+    // 10 AM to 11 PM (10-23), then 12 AM to 1 AM (0-1)
+    List<int> hours = [];
+    
+    // Add 10 AM to 11 PM (10-23)
+    for (int hour = 10; hour <= 23; hour++) {
+      hours.add(hour);
+    }
+    
+    // Add 12 AM to 1 AM (0-1) for next day
+    hours.add(0);
+    hours.add(1);
+
+    for (int hour in hours) {
       // Skip past hours for today
       if (_selectedDate.day == now.day &&
           _selectedDate.month == now.month &&
