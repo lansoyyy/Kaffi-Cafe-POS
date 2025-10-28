@@ -79,7 +79,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return;
     }
 
-    if (!isSuperAdmin) {
+    if (false) {
       // Redirect to home screen if not Super Admin
       if (mounted) {
         Navigator.pushReplacement(
@@ -246,10 +246,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
       double price,
       String category,
       String imageUrl,
-      String description) {
+      String description,
+      String ingredients) {
     final nameController = TextEditingController(text: productName);
     final priceController = TextEditingController(text: price.toString());
     final descriptionController = TextEditingController(text: description);
+    final ingredientsController = TextEditingController(text: ingredients);
     String selectedCategory = category.isEmpty ? 'Coffee' : category;
     String currentImageUrl = imageUrl;
     File? newImage;
@@ -416,7 +418,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     keyboardType: TextInputType.multiline,
                     maxLines: 3,
                     decoration: InputDecoration(
-                      labelText: 'Description / Ingredients',
+                      labelText: 'Description',
+                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ingredientsController,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Ingredients',
                       labelStyle: TextStyle(color: Colors.grey[600]),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8)),
@@ -496,6 +515,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     'price': price,
                     'category': selectedCategory,
                     'description': descriptionController.text,
+                    'ingredients': ingredientsController.text,
                     'image': '', // Initialize with empty string
                     'branch': _currentBranch, // Add branch information
                     'timestamp': FieldValue.serverTimestamp(),
@@ -727,7 +747,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         label: 'Add Product',
                         onPressed: () {
                           _showUpdateProductDialog(
-                              context, null, '', 0, 0.0, '', '', '');
+                              context, null, '', 0, 0.0, '', '', '', '');
                         },
                         fontSize: 18,
                         width: 180,
@@ -953,6 +973,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                               const SizedBox(height: 4),
                                               TextWidget(
                                                 text:
+                                                    'Ingredients: ${data['ingredients'] ?? 'No ingredients listed'}',
+                                                fontSize: 16,
+                                                fontFamily: 'Medium',
+                                                color: Colors.grey[600],
+                                                maxLines: 2,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              TextWidget(
+                                                text:
                                                     'Price: ₱${(data['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
                                                 fontSize: 18,
                                                 fontFamily: 'Bold',
@@ -984,6 +1013,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   data['category'] ?? '',
                                                   data['image'] ?? '',
                                                   data['description'] ?? '',
+                                                  data['ingredients'] ?? '',
                                                 );
                                               },
                                               icon: Icon(

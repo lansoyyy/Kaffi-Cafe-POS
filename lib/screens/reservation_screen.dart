@@ -37,7 +37,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
   StreamSubscription? _reservationsListener;
 
   // Tab management
-  int _selectedTabIndex = 0; // 0: Reservations, 1: Monitoring, 2: History
+  int _selectedTabIndex = 0; // 0: Monitoring, 1: History, 2: Tables
 
   // Monitoring state
   List<Map<String, dynamic>> _activeReservations = [];
@@ -316,12 +316,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
     // Operating hours: 10:00 AM to 2:00 AM (next day)
     // 10 AM to 11 PM (10-23), then 12 AM to 1 AM (0-1)
     List<int> hours = [];
-    
+
     // Add 10 AM to 11 PM (10-23)
     for (int hour = 10; hour <= 23; hour++) {
       hours.add(hour);
     }
-    
+
     // Add 12 AM to 1 AM (0-1) for next day
     hours.add(0);
     hours.add(1);
@@ -648,8 +648,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _orderController.dispose();
     _reservationExpiryTimer?.cancel();
     _reservationsListener?.cancel();
     _countdownTimer?.cancel();
@@ -686,6 +684,259 @@ class _ReservationScreenState extends State<ReservationScreen> {
       });
       // Update real-time listener for new date
       _setupRealtimeListener();
+    }
+  }
+
+  void _showTableReservationDetails(BuildContext context,
+      Map<String, dynamic> table, Map<String, dynamic>? reservation) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final fontSize = screenWidth * 0.018;
+
+    if (reservation == null) {
+      // Show available table dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          backgroundColor: plainWhite,
+          title: TextWidget(
+            text: '${table['name']} - Available',
+            fontSize: fontSize + 4,
+            color: textBlack,
+            isBold: true,
+            fontFamily: 'Bold',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextWidget(
+                text: 'Capacity: ${table['capacity']} guests',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Status: Available',
+                fontSize: fontSize + 2,
+                color: palmGreen,
+                isBold: true,
+                fontFamily: 'Bold',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text:
+                    'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+            ],
+          ),
+          actions: [
+            ButtonWidget(
+              label: 'Close',
+              onPressed: () => Navigator.of(context).pop(),
+              color: AppTheme.primaryColor,
+              textColor: plainWhite,
+              fontSize: fontSize + 1,
+              height: 45,
+              width: 100,
+              radius: 10,
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show reserved table dialog with detailed information
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: plainWhite,
+        title: TextWidget(
+          text: '${table['name']} - Reserved',
+          fontSize: fontSize + 4,
+          color: textBlack,
+          isBold: true,
+          fontFamily: 'Bold',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextWidget(
+                text:
+                    'Customer: ${reservation['userName'] ?? reservation['userEmail'] ?? 'N/A'}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text:
+                    'Date: ${reservation['dateDisplay'] ?? reservation['date']}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text:
+                    'Time: ${reservation['timeSlotDisplay'] ?? reservation['time']}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Guests: ${reservation['guests'] ?? 'N/A'}',
+                fontSize: fontSize + 2,
+                color: textBlack,
+                fontFamily: 'Regular',
+              ),
+              const SizedBox(height: 8),
+              TextWidget(
+                text: 'Status: ${reservation['status'] ?? 'confirmed'}',
+                fontSize: fontSize + 2,
+                color: reservation['status'] == 'confirmed'
+                    ? AppTheme.primaryColor
+                    : reservation['status'] == 'pending'
+                        ? Colors.orange
+                        : festiveRed,
+                isBold: true,
+                fontFamily: 'Bold',
+              ),
+              if (reservation['createdAt'] != null) ...[
+                const SizedBox(height: 8),
+                TextWidget(
+                  text:
+                      'Created: ${_formatTimestamp(reservation['createdAt'])}',
+                  fontSize: fontSize + 1,
+                  color: charcoalGray,
+                  fontFamily: 'Regular',
+                ),
+              ],
+              if (reservation['updatedAt'] != null) ...[
+                const SizedBox(height: 8),
+                TextWidget(
+                  text:
+                      'Updated: ${_formatTimestamp(reservation['updatedAt'])}',
+                  fontSize: fontSize + 1,
+                  color: charcoalGray,
+                  fontFamily: 'Regular',
+                ),
+              ],
+              if (reservation['orderDetails'] != null) ...[
+                const SizedBox(height: 8),
+                TextWidget(
+                  text: 'Order: ${reservation['orderDetails']}',
+                  fontSize: fontSize + 2,
+                  color: textBlack,
+                  fontFamily: 'Regular',
+                ),
+              ],
+              if (reservation['source'] != null) ...[
+                const SizedBox(height: 8),
+                TextWidget(
+                  text: 'Source: ${reservation['source']}',
+                  fontSize: fontSize + 1,
+                  color: charcoalGray,
+                  fontFamily: 'Regular',
+                ),
+              ],
+              // Check if reservation is ongoing
+              if (_isReservationOngoing(reservation)) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: palmGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: palmGreen),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.access_time,
+                          color: palmGreen, size: fontSize + 2),
+                      const SizedBox(width: 8),
+                      TextWidget(
+                        text: 'Ongoing',
+                        fontSize: fontSize + 1,
+                        color: palmGreen,
+                        isBold: true,
+                        fontFamily: 'Bold',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          ButtonWidget(
+            label: 'Close',
+            onPressed: () => Navigator.of(context).pop(),
+            color: AppTheme.primaryColor,
+            textColor: plainWhite,
+            fontSize: fontSize + 1,
+            height: 45,
+            width: 100,
+            radius: 10,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Format timestamp for display
+  String _formatTimestamp(Timestamp timestamp) {
+    final dateTime = timestamp.toDate();
+    return DateFormat('dd/MM/yyyy HH:mm:ss').format(dateTime);
+  }
+
+  // Check if reservation is ongoing
+  bool _isReservationOngoing(Map<String, dynamic> reservation) {
+    try {
+      final dateStr = reservation['date'];
+      final timeStr = reservation['timeSlot'] ?? reservation['time'];
+
+      if (dateStr == null || timeStr == null) return false;
+
+      // Parse date (yyyy-MM-dd)
+      final dateParts = dateStr.split('-');
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      // Parse time (e.g., "7:00 AM")
+      final timeParts = timeStr.split(' ');
+      final hourMin = timeParts[0].split(':');
+      int hour = int.parse(hourMin[0]);
+      final minute = int.parse(hourMin[1]);
+
+      // Convert to 24-hour format
+      if (timeParts.length > 1) {
+        if (timeParts[1] == 'PM' && hour != 12) {
+          hour += 12;
+        } else if (timeParts[1] == 'AM' && hour == 12) {
+          hour = 0;
+        }
+      }
+
+      final reservationTime = DateTime(year, month, day, hour, minute);
+      final endTime = reservationTime.add(const Duration(minutes: 55));
+      final now = DateTime.now();
+
+      return now.isAfter(reservationTime) && now.isBefore(endTime);
+    } catch (e) {
+      return false;
     }
   }
 
@@ -850,407 +1101,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
-  void _showCreateReservationDialog(BuildContext context) {
-    if (_selectedTime == null || _selectedTableId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: TextWidget(
-            text: 'Please select a time and table',
-            fontSize: 14,
-            color: plainWhite,
-            fontFamily: 'Regular',
-          ),
-          backgroundColor: festiveRed,
-        ),
-      );
-      return;
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final fontSize = screenWidth * 0.018;
-
-    _nameController.clear();
-    _orderController.clear();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        backgroundColor: plainWhite,
-        title: TextWidget(
-          text:
-              'Create Reservation for ${_tables.firstWhere((t) => t['id'] == _selectedTableId)['name']}',
-          fontSize: fontSize + 4,
-          color: textBlack,
-          isBold: true,
-          fontFamily: 'Bold',
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Customer Name',
-                  labelStyle: TextStyle(
-                    fontSize: fontSize + 2,
-                    fontFamily: 'Regular',
-                    color: charcoalGray,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: fontSize + 2,
-                  fontFamily: 'Regular',
-                  color: textBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _orderController,
-                decoration: InputDecoration(
-                  labelText: 'Order Details',
-                  labelStyle: TextStyle(
-                    fontSize: fontSize + 2,
-                    fontFamily: 'Regular',
-                    color: charcoalGray,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: fontSize + 2,
-                  fontFamily: 'Regular',
-                  color: textBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextWidget(
-                text: 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-              const SizedBox(height: 8),
-              TextWidget(
-                text: 'Time: $_selectedTime',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-              const SizedBox(height: 8),
-              TextWidget(
-                text: 'Guests: $_numberOfGuests',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          ButtonWidget(
-            label: 'Cancel',
-            onPressed: () => Navigator.of(context).pop(),
-            color: ashGray,
-            textColor: textBlack,
-            fontSize: fontSize + 1,
-            height: 45,
-            width: 100,
-            radius: 10,
-          ),
-          ButtonWidget(
-            label: 'Confirm',
-            onPressed: () async {
-              if (_nameController.text.isEmpty ||
-                  _orderController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Please fill in all fields',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: festiveRed,
-                  ),
-                );
-                return;
-              }
-              try {
-                final selectedTable =
-                    _tables.firstWhere((t) => t['id'] == _selectedTableId);
-
-                // Generate time slot display (e.g., "7:00 AM - 7:55 AM")
-                String timeSlotDisplay = _selectedTime!;
-                if (!_selectedTime!.contains('-')) {
-                  // Convert single time to time range
-                  final timeParts = _selectedTime!.split(' ');
-                  final hourMin = timeParts[0].split(':');
-                  final hour = int.parse(hourMin[0]);
-                  final period = timeParts[1];
-                  timeSlotDisplay = '$hour:00 $period - $hour:55 $period';
-                }
-
-                await _firestore.collection('reservations').add({
-                  'userId':
-                      'pos_${_nameController.text.toLowerCase().replaceAll(' ', '_')}',
-                  'userEmail': _nameController.text,
-                  'userName': _nameController.text,
-                  'tableId': _selectedTableId,
-                  'tableName': selectedTable['name'],
-                  'tableCapacity': selectedTable['capacity'],
-                  'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
-                  'dateDisplay': DateFormat('dd/MM/yyyy').format(_selectedDate),
-                  'timeSlot': _selectedTime, // Start time for compatibility
-                  'timeSlotDisplay': timeSlotDisplay, // Full time range
-                  'guests': _numberOfGuests,
-                  'status':
-                      'confirmed', // POS reservations are immediately confirmed
-                  'source': 'POS', // Indicates reservation made via POS
-                  'orderDetails': _orderController.text, // Store order details
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
-                Navigator.of(context).pop();
-                setState(() {
-                  _selectedTime = null;
-                  _selectedTableId = null;
-                  _nameController.clear();
-                  _orderController.clear();
-                  _numberOfGuests = 1;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text:
-                          'Reservation confirmed for ${_tables.firstWhere((t) => t['id'] == _selectedTableId)['name']} at $_selectedTime',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: AppTheme.primaryColor,
-                  ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Error creating reservation: $e',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: festiveRed,
-                  ),
-                );
-              }
-            },
-            color: AppTheme.primaryColor,
-            textColor: plainWhite,
-            fontSize: fontSize + 1,
-            height: 45,
-            width: 100,
-            radius: 10,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditReservationDialog(
-      BuildContext context, Map<String, dynamic> table) {
-    final reservation = table['reservation'];
-    final screenWidth = MediaQuery.of(context).size.width;
-    final fontSize = screenWidth * 0.018;
-
-    _nameController.text = reservation['name'];
-    _orderController.text = reservation['order'];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        backgroundColor: plainWhite,
-        title: TextWidget(
-          text: 'Edit Reservation for ${table['name']}',
-          fontSize: fontSize + 4,
-          color: textBlack,
-          isBold: true,
-          fontFamily: 'Bold',
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Customer Name',
-                  labelStyle: TextStyle(
-                    fontSize: fontSize + 2,
-                    fontFamily: 'Regular',
-                    color: charcoalGray,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: fontSize + 2,
-                  fontFamily: 'Regular',
-                  color: textBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _orderController,
-                decoration: InputDecoration(
-                  labelText: 'Order Details',
-                  labelStyle: TextStyle(
-                    fontSize: fontSize + 2,
-                    fontFamily: 'Regular',
-                    color: charcoalGray,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: fontSize + 2,
-                  fontFamily: 'Regular',
-                  color: textBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextWidget(
-                text: 'Date: ${reservation['date']}',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-              const SizedBox(height: 8),
-              TextWidget(
-                text: 'Time: ${reservation['time']}',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-              const SizedBox(height: 8),
-              TextWidget(
-                text: 'Guests: $_numberOfGuests',
-                fontSize: fontSize + 2,
-                color: textBlack,
-                fontFamily: 'Regular',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          ButtonWidget(
-            label: 'Cancel',
-            onPressed: () => Navigator.of(context).pop(),
-            color: ashGray,
-            textColor: textBlack,
-            fontSize: fontSize + 1,
-            height: 45,
-            width: 100,
-            radius: 10,
-          ),
-          ButtonWidget(
-            label: 'Save',
-            onPressed: () async {
-              if (_nameController.text.isEmpty ||
-                  _orderController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Please fill in all fields',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: festiveRed,
-                  ),
-                );
-                return;
-              }
-              try {
-                await _firestore
-                    .collection('reservations')
-                    .doc(table['docId'])
-                    .update({
-                  'userName': _nameController.text,
-                  'userEmail': _nameController.text,
-                  'orderDetails': _orderController.text,
-                  'guests': _numberOfGuests,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                });
-                Navigator.of(context).pop();
-                setState(() {
-                  _nameController.clear();
-                  _orderController.clear();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Reservation updated successfully',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: AppTheme.primaryColor,
-                  ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: TextWidget(
-                      text: 'Error updating reservation: $e',
-                      fontSize: fontSize,
-                      color: plainWhite,
-                      fontFamily: 'Regular',
-                    ),
-                    backgroundColor: festiveRed,
-                  ),
-                );
-              }
-            },
-            color: AppTheme.primaryColor,
-            textColor: plainWhite,
-            fontSize: fontSize + 1,
-            height: 45,
-            width: 100,
-            radius: 10,
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1265,12 +1115,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
         elevation: 4,
         title: TextWidget(
           text: _selectedTabIndex == 0
-              ? 'Reservations'
+              ? 'Monitoring'
               : _selectedTabIndex == 1
-                  ? 'Monitoring'
-                  : _selectedTabIndex == 2
-                      ? 'History'
-                      : 'Table Management',
+                  ? 'History'
+                  : 'Tables',
           fontSize: 24,
           fontFamily: 'Bold',
           color: plainWhite,
@@ -1282,12 +1130,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
             child: Row(
               children: [
                 ButtonWidget(
-                  label: 'Reservations',
+                  label: 'Monitoring',
                   onPressed: () {
                     setState(() {
                       _selectedTabIndex = 0;
                       _isTableManagementMode = false;
                     });
+                    _loadActiveReservations();
                   },
                   color: _selectedTabIndex == 0
                       ? plainWhite
@@ -1302,39 +1151,18 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 ),
                 const SizedBox(width: 6),
                 ButtonWidget(
-                  label: 'Monitoring',
+                  label: 'History',
                   onPressed: () {
                     setState(() {
                       _selectedTabIndex = 1;
                       _isTableManagementMode = false;
                     });
-                    _loadActiveReservations();
+                    _loadReservationHistory();
                   },
                   color: _selectedTabIndex == 1
                       ? plainWhite
                       : AppTheme.primaryColor.withOpacity(0.7),
                   textColor: _selectedTabIndex == 1
-                      ? AppTheme.primaryColor
-                      : plainWhite,
-                  fontSize: 13,
-                  height: 40,
-                  radius: 8,
-                  width: 100,
-                ),
-                const SizedBox(width: 6),
-                ButtonWidget(
-                  label: 'History',
-                  onPressed: () {
-                    setState(() {
-                      _selectedTabIndex = 2;
-                      _isTableManagementMode = false;
-                    });
-                    _loadReservationHistory();
-                  },
-                  color: _selectedTabIndex == 2
-                      ? plainWhite
-                      : AppTheme.primaryColor.withOpacity(0.7),
-                  textColor: _selectedTabIndex == 2
                       ? AppTheme.primaryColor
                       : plainWhite,
                   fontSize: 13,
@@ -1347,15 +1175,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   label: 'Tables',
                   onPressed: () {
                     setState(() {
-                      _selectedTabIndex = 3;
+                      _selectedTabIndex = 2;
                       _isTableManagementMode = true;
                     });
                     _loadTableReservations();
                   },
-                  color: _selectedTabIndex == 3
+                  color: _selectedTabIndex == 2
                       ? plainWhite
                       : AppTheme.primaryColor.withOpacity(0.7),
-                  textColor: _selectedTabIndex == 3
+                  textColor: _selectedTabIndex == 2
                       ? AppTheme.primaryColor
                       : plainWhite,
                   fontSize: 13,
@@ -1369,13 +1197,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ],
       ),
       body: _selectedTabIndex == 0
-          ? _buildReservationView(context, screenWidth, fontSize, padding)
+          ? _buildMonitoringView(context, screenWidth, fontSize, padding)
           : _selectedTabIndex == 1
-              ? _buildMonitoringView(context, screenWidth, fontSize, padding)
-              : _selectedTabIndex == 2
-                  ? _buildHistoryView(context, screenWidth, fontSize, padding)
-                  : _buildTableManagementView(
-                      context, screenWidth, fontSize, padding),
+              ? _buildHistoryView(context, screenWidth, fontSize, padding)
+              : _buildTableManagementView(
+                  context, screenWidth, fontSize, padding),
     );
   }
 
@@ -1387,6 +1213,46 @@ class _ReservationScreenState extends State<ReservationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Current date display
+          Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(20.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color: plainWhite,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.today,
+                    color: AppTheme.primaryColor,
+                    size: fontSize * 2,
+                  ),
+                  const SizedBox(width: 16),
+                  TextWidget(
+                    text:
+                        'Today: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                    fontSize: fontSize + 4,
+                    color: textBlack,
+                    isBold: true,
+                    fontFamily: 'Bold',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           // Total tables summary
           Card(
             elevation: 4,
@@ -1475,114 +1341,89 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Container(
-                    padding: EdgeInsets.all(padding),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      color: isEnabled ? plainWhite : ashGray.withOpacity(0.3),
-                      border: Border.all(
-                        color: statusColor,
-                        width: 2,
+                  child: InkWell(
+                    onTap: () => _showTableReservationDetails(
+                        context, table, reservation),
+                    borderRadius: BorderRadius.circular(15),
+                    child: Container(
+                      padding: EdgeInsets.all(padding),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        color:
+                            isEnabled ? plainWhite : ashGray.withOpacity(0.3),
+                        border: Border.all(
+                          color: statusColor,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              TextWidget(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Icon(
+                                Icons.table_restaurant,
+                                size: fontSize * 2,
+                                color: statusColor,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Center(
+                              child: TextWidget(
                                 text: table['name'],
                                 fontSize: fontSize + 2,
                                 color: isEnabled ? textBlack : charcoalGray,
                                 isBold: true,
                                 fontFamily: 'Bold',
                               ),
-                              Icon(
-                                statusIcon,
-                                color: statusColor,
-                                size: fontSize * 1.5,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextWidget(
-                            text: 'Capacity: ${table['capacity']} guests',
-                            fontSize: fontSize,
-                            color: isEnabled
-                                ? charcoalGray
-                                : charcoalGray.withOpacity(0.6),
-                            fontFamily: 'Regular',
-                          ),
-                          const SizedBox(height: 8),
-                          TextWidget(
-                            text: 'Status: $status',
-                            fontSize: fontSize,
-                            color: statusColor,
-                            isBold: true,
-                            fontFamily: 'Bold',
-                          ),
-                          if (reservation != null) ...[
+                            ),
                             const SizedBox(height: 8),
                             TextWidget(
-                              text:
-                                  'Customer: ${reservation['userName'] ?? reservation['userEmail']}',
-                              fontSize: fontSize - 2,
-                              color: textBlack,
+                              text: 'Capacity: ${table['capacity']} guests',
+                              fontSize: fontSize,
+                              color: isEnabled
+                                  ? charcoalGray
+                                  : charcoalGray.withOpacity(0.6),
                               fontFamily: 'Regular',
                             ),
-                            TextWidget(
-                              text:
-                                  'Time: ${reservation['timeSlotDisplay'] ?? reservation['time']}',
-                              fontSize: fontSize - 2,
-                              color: textBlack,
-                              fontFamily: 'Regular',
-                            ),
-                            if (reservation['status'] == 'pending')
-                              TextWidget(
-                                text: '(Pending)',
-                                fontSize: fontSize - 2,
-                                color: Colors.orange,
+                            const SizedBox(height: 8),
+                            Center(
+                              child: TextWidget(
+                                text: 'Status: $status',
+                                fontSize: fontSize,
+                                color: statusColor,
+                                isBold: true,
                                 fontFamily: 'Bold',
                               ),
-                          ],
-                          SizedBox(
-                            height: 20,
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              ButtonWidget(
-                                label: isEnabled ? 'Disable' : 'Enable',
-                                onPressed: () =>
-                                    _toggleTableStatus(table['id']),
-                                color: isEnabled ? festiveRed : palmGreen,
-                                textColor: plainWhite,
-                                fontSize: fontSize - 2,
-                                height: 35,
-                                radius: 8,
-                                width: 80,
-                              ),
-                              if (reservation != null)
-                                ButtonWidget(
-                                  label: 'View',
-                                  onPressed: () =>
-                                      _showReservationDetails(context, {
-                                    ...table,
-                                    'reservation': reservation,
-                                    'docId': reservation['docId'],
-                                  }),
+                            ),
+                            if (reservation != null) ...[
+                              const SizedBox(height: 8),
+                              Center(
+                                child: TextWidget(
+                                  text: 'Reserved',
+                                  fontSize: fontSize - 1,
                                   color: AppTheme.primaryColor,
-                                  textColor: plainWhite,
-                                  fontSize: fontSize - 2,
-                                  height: 35,
-                                  radius: 8,
-                                  width: 60,
+                                  isBold: true,
+                                  fontFamily: 'Bold',
                                 ),
+                              ),
+                              TextWidget(
+                                text:
+                                    'Time: ${reservation['timeSlotDisplay'] ?? reservation['time']}',
+                                fontSize: fontSize - 2,
+                                color: textBlack,
+                                fontFamily: 'Regular',
+                              ),
+                              TextWidget(
+                                text:
+                                    'Customer: ${reservation['userName'] ?? reservation['userEmail']}',
+                                fontSize: fontSize - 2,
+                                color: textBlack,
+                                fontFamily: 'Regular',
+                              ),
                             ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1658,309 +1499,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
-  // Build reservation view (original view)
-  Widget _buildReservationView(BuildContext context, double screenWidth,
-      double fontSize, double padding) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextWidget(
-                    text: 'Select Date',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        color: plainWhite,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextWidget(
-                            text:
-                                DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            fontSize: fontSize + 2,
-                            color: textBlack,
-                            isBold: true,
-                            fontFamily: 'Bold',
-                          ),
-                          ButtonWidget(
-                            label: 'Pick Date',
-                            onPressed: () => _selectDate(context),
-                            color: AppTheme.primaryColor,
-                            textColor: plainWhite,
-                            fontSize: fontSize + 1,
-                            height: 50,
-                            radius: 12,
-                            width: 120,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextWidget(
-                    text: 'Number of Guests',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      ButtonWidget(
-                        label: '-',
-                        onPressed: () {
-                          setState(() {
-                            if (_numberOfGuests > 1) _numberOfGuests--;
-                          });
-                        },
-                        color: ashGray,
-                        textColor: textBlack,
-                        fontSize: fontSize + 1,
-                        height: 50,
-                        width: 60,
-                        radius: 10,
-                      ),
-                      const SizedBox(width: 16),
-                      TextWidget(
-                        text:
-                            '$_numberOfGuests Guest${_numberOfGuests > 1 ? 's' : ''}',
-                        fontSize: fontSize + 2,
-                        color: textBlack,
-                        fontFamily: 'Regular',
-                      ),
-                      const SizedBox(width: 16),
-                      ButtonWidget(
-                        label: '+',
-                        onPressed: () {
-                          setState(() {
-                            _numberOfGuests++;
-                          });
-                        },
-                        color: AppTheme.primaryColor,
-                        textColor: plainWhite,
-                        fontSize: fontSize + 1,
-                        height: 50,
-                        width: 60,
-                        radius: 10,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  TextWidget(
-                    text: 'Select Time',
-                    fontSize: 24,
-                    color: textBlack,
-                    isBold: true,
-                    fontFamily: 'Bold',
-                    letterSpacing: 1,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: _availableTimeSlots.map((time) {
-                      final isSelected = _selectedTime == time;
-                      return ChoiceChip(
-                        showCheckmark: false,
-                        label: TextWidget(
-                          text: time,
-                          fontSize: fontSize + 1,
-                          color: isSelected ? plainWhite : textBlack,
-                          isBold: isSelected,
-                          fontFamily: 'Regular',
-                        ),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedTime = time;
-                              _selectedTableId = null;
-                            });
-                            _updateTableAvailability();
-                          }
-                        },
-                        backgroundColor: cloudWhite,
-                        selectedColor: AppTheme.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(
-                            color: isSelected ? AppTheme.primaryColor : ashGray,
-                            width: 1.5,
-                          ),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        elevation: isSelected ? 4 : 0,
-                        pressElevation: 6,
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextWidget(
-                  text: 'Select Table',
-                  fontSize: 24,
-                  color: textBlack,
-                  isBold: true,
-                  fontFamily: 'Bold',
-                  letterSpacing: 1,
-                ),
-                const SizedBox(height: 12),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio:
-                              screenWidth * 0.25 / (screenWidth * 0.25),
-                        ),
-                        itemCount: _tables.length,
-                        itemBuilder: (context, index) {
-                          final table = _tables[index];
-                          final isSelected = _selectedTableId == table['id'];
-                          final isAvailable =
-                              (_tableAvailability[table['id']] ?? true) &&
-                                  (_tableEnabledStatus[table['id']] ?? true) &&
-                                  _numberOfGuests <= table['capacity'];
-                          return Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                if (isAvailable && _selectedTime != null) {
-                                  setState(() {
-                                    _selectedTableId = table['id'];
-                                  });
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(15),
-                              child: Container(
-                                padding: EdgeInsets.all(padding),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  color: isAvailable
-                                      ? plainWhite
-                                      : ashGray.withOpacity(0.3),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppTheme.primaryColor
-                                        : isAvailable
-                                            ? palmGreen
-                                            : festiveRed,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    TextWidget(
-                                      text: table['name'],
-                                      fontSize: fontSize + 2,
-                                      color: isAvailable
-                                          ? textBlack
-                                          : charcoalGray,
-                                      isBold: true,
-                                      fontFamily: 'Bold',
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextWidget(
-                                      text:
-                                          'Capacity: ${table['capacity']} guests',
-                                      fontSize: fontSize,
-                                      color: isAvailable
-                                          ? charcoalGray
-                                          : charcoalGray.withOpacity(0.6),
-                                      fontFamily: 'Regular',
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextWidget(
-                                      text: isAvailable
-                                          ? 'Available'
-                                          : 'Occupied',
-                                      fontSize: fontSize,
-                                      color: isAvailable
-                                          ? AppTheme.primaryColor
-                                          : charcoalGray,
-                                      isBold: true,
-                                      fontFamily: 'Bold',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                const SizedBox(height: 20),
-                Center(
-                  child: ButtonWidget(
-                    label: 'Create Reservation',
-                    onPressed: _selectedTime != null && _selectedTableId != null
-                        ? () => _showCreateReservationDialog(context)
-                        : () {},
-                    color: _selectedTime != null && _selectedTableId != null
-                        ? AppTheme.primaryColor
-                        : ashGray,
-                    textColor: plainWhite,
-                    fontSize: fontSize + 2,
-                    height: 60,
-                    radius: 10,
-                    width: screenWidth * 0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Build monitoring view
   Widget _buildMonitoringView(BuildContext context, double screenWidth,
       double fontSize, double padding) {
@@ -1969,7 +1507,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header with date
           Card(
             elevation: 4,
             shape: RoundedRectangleBorder(
@@ -1981,37 +1519,60 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 borderRadius: BorderRadius.circular(15),
                 color: plainWhite,
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.monitor_heart,
-                    color: AppTheme.primaryColor,
-                    size: fontSize * 2,
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      TextWidget(
-                        text: 'Active Reservations',
-                        fontSize: fontSize + 4,
-                        color: textBlack,
-                        isBold: true,
-                        fontFamily: 'Bold',
+                      Icon(
+                        Icons.monitor_heart,
+                        color: AppTheme.primaryColor,
+                        size: fontSize * 2,
                       ),
-                      TextWidget(
-                        text:
-                            '${_activeReservations.length} reservation(s) today',
-                        fontSize: fontSize,
-                        color: charcoalGray,
-                        fontFamily: 'Regular',
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextWidget(
+                            text: 'Active Reservations',
+                            fontSize: fontSize + 4,
+                            color: textBlack,
+                            isBold: true,
+                            fontFamily: 'Bold',
+                          ),
+                          TextWidget(
+                            text:
+                                '${_activeReservations.length} reservation(s) today',
+                            fontSize: fontSize,
+                            color: charcoalGray,
+                            fontFamily: 'Regular',
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.refresh, color: AppTheme.primaryColor),
+                        onPressed: _loadActiveReservations,
                       ),
                     ],
                   ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.refresh, color: AppTheme.primaryColor),
-                    onPressed: _loadActiveReservations,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.today,
+                        color: AppTheme.primaryColor,
+                        size: fontSize * 1.5,
+                      ),
+                      const SizedBox(width: 8),
+                      TextWidget(
+                        text:
+                            'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                        fontSize: fontSize + 1,
+                        color: textBlack,
+                        fontFamily: 'Regular',
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2211,8 +1772,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                         const SizedBox(height: 8),
                                         _buildDetailRow(
                                           Icons.people,
-                                          'Guests',
-                                          '${reservation['guests']} guest(s)',
+                                          'Table',
+                                          reservation['tableName'] ?? 'N/A',
                                           fontSize,
                                         ),
                                       ],
@@ -2466,7 +2027,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                             ],
                           ),
                           trailing: TextWidget(
-                            text: '${reservation['guests']} guests',
+                            text: reservation['dateDisplay'] ??
+                                reservation['date'],
                             fontSize: fontSize - 1,
                             color: charcoalGray,
                             fontFamily: 'Regular',
