@@ -1155,6 +1155,10 @@ class _HomeScreenState extends State<HomeScreen>
                   final buyer = data['buyer']?.toString().toLowerCase() ?? '';
                   return orderId.contains(_searchQuery) ||
                       buyer.contains(_searchQuery);
+                }).where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final status = data['status']?.toString() ?? '';
+                  return status == 'Pending';
                 }).toList();
                 return Padding(
                   padding: const EdgeInsets.only(right: 10),

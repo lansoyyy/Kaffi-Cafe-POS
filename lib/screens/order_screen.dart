@@ -649,6 +649,13 @@ class _OrderScreenState extends State<OrderScreen>
                       fontFamily: 'Regular',
                       color: Colors.grey[700],
                     ),
+                    TextWidget(
+                      text: 'Remarks: ${orderData['specialRemarks']}',
+                      fontSize: 14,
+                      fontFamily: 'Regular',
+                      color: Colors.grey[700],
+                    ),
+
                     const SizedBox(height: 16),
                     TextWidget(
                       text: 'Items:',
@@ -904,6 +911,13 @@ class _OrderScreenState extends State<OrderScreen>
                         ),
                         const SizedBox(height: 8),
                       ],
+                      TextWidget(
+                        text: 'Remarks: ${data['specialRemarks']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
                       // Display voucher information if available
                       if (data['voucherCode'] != null) ...[
                         Container(
@@ -1226,6 +1240,13 @@ class _OrderScreenState extends State<OrderScreen>
                         ),
                         const SizedBox(height: 8),
                       ],
+                      TextWidget(
+                        text: 'Remarks: ${data['specialRemarks']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
                       // Display voucher information if available
                       if (data['voucherCode'] != null) ...[
                         Container(
@@ -1537,6 +1558,13 @@ class _OrderScreenState extends State<OrderScreen>
                         ),
                         const SizedBox(height: 8),
                       ],
+                      TextWidget(
+                        text: 'Remarks: ${data['specialRemarks']}',
+                        fontSize: 14,
+                        fontFamily: 'Regular',
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(height: 8),
                       // Display voucher information if available
                       if (data['voucherCode'] != null) ...[
                         Container(
