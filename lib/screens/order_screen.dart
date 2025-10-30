@@ -1752,6 +1752,7 @@ class _OrderScreenState extends State<OrderScreen>
 
   // Show order received success dialog
   void _showOrderReceivedSuccessDialog(Map<String, dynamic> orderData) async {
+    print(orderData);
     print(
         'Showing order received success dialog for order #${orderData['orderId']}');
 
@@ -1884,6 +1885,7 @@ class _OrderScreenState extends State<OrderScreen>
   // Fetch reservation details associated with an order
   Future<Map<String, dynamic>?> _fetchReservationDetails(
       Map<String, dynamic> orderData) async {
+    print(orderData);
     try {
       // Debug print to check order data
       print('Order data for reservation check:');
@@ -1923,7 +1925,7 @@ class _OrderScreenState extends State<OrderScreen>
             .collection('reservations')
             .where('tableId', isEqualTo: orderData['reservationTableId'])
             .where('date', isEqualTo: formattedDate)
-            .where('time', isEqualTo: orderData['reservationTime'])
+            .where('timeSlot', isEqualTo: orderData['reservationTime'])
             .limit(1) // Remove status filter to get any reservation
             .get();
 
