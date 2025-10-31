@@ -1165,6 +1165,13 @@ class _OrderScreenState extends State<OrderScreen>
     final items =
         (data['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
 
+    // Calculate the deadline time (20 minutes after order creation)
+    final Timestamp orderTimestamp = data['timestamp'] as Timestamp;
+    final DateTime orderTime = orderTimestamp.toDate();
+    final DateTime deadlineTime = orderTime.add(const Duration(minutes: 20));
+    final String formattedDeadline =
+        DateFormat('MMM dd, yyyy HH:mm').format(deadlineTime);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1203,6 +1210,43 @@ class _OrderScreenState extends State<OrderScreen>
                     ],
                   ),
                 ),
+                // Pre-order preparation notice
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.access_time,
+                          color: Colors.orange[700], size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextWidget(
+                              text:
+                                  'Kindly prepare this pre-order for completion',
+                              fontSize: 14,
+                              fontFamily: 'Medium',
+                              color: Colors.orange[700],
+                            ),
+                            TextWidget(
+                              text: 'before $formattedDeadline',
+                              fontSize: 14,
+                              fontFamily: 'Medium',
+                              color: Colors.orange[700],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // Order details
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -1222,14 +1266,6 @@ class _OrderScreenState extends State<OrderScreen>
                         fontFamily: 'Regular',
                         color: Colors.grey[700],
                       ),
-                      // const SizedBox(height: 8),
-                      // TextWidget(
-                      //   text:
-                      //       'Date: ${DateFormat('MMM dd, yyyy HH:mm').format((data['timestamp'] as Timestamp).toDate())}',
-                      //   fontSize: 14,
-                      //   fontFamily: 'Regular',
-                      //   color: Colors.grey[700],
-                      // ),
                       const SizedBox(height: 8),
                       if (data['paymentMethod'] != null) ...[
                         TextWidget(
@@ -2531,14 +2567,38 @@ class _OrderScreenState extends State<OrderScreen>
                 fontSize: 16,
                 fontFamily: 'Medium',
               ),
-              tabs: const [
+              tabs: [
                 Tab(
-                  icon: Icon(Icons.restaurant),
-                  text: 'Dine in',
+                  child: SizedBox(
+                    width: 150,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.restaurant),
+                        SizedBox(
+                          width: 10,
+                        ),
+                        Text('Dine in'),
+                      ],
+                    ),
+                  ),
                 ),
                 Tab(
-                  icon: Icon(Icons.takeout_dining),
-                  text: 'Pickup',
+                  child: SizedBox(
+                    width: 150,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.takeout_dining),
+                        SizedBox(
+                          width: 10,
+                        ),
+                        Text('Pickup'),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -2630,7 +2690,6 @@ class _OrderScreenState extends State<OrderScreen>
             children: [
               // Status Counts Section
               Container(
-                padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -3185,19 +3244,19 @@ class _OrderScreenState extends State<OrderScreen>
           child: Text(
             '$count',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
         ),
-        const SizedBox(height: 8),
         TextWidget(
           text: title,
-          fontSize: 12,
+          fontSize: 11,
           fontFamily: 'Medium',
           color: Colors.grey[700],
         ),
+        const SizedBox(height: 3),
       ],
     );
   }
