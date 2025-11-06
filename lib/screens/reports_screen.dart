@@ -230,7 +230,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       }
 
       // Order type breakdown
-      if (orderType == 'Dine-in') {
+      if (orderType == 'Dine in') {
         dineInCount++;
       } else if (orderType == 'Pickup') {
         pickupCount++;
@@ -243,7 +243,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         'GCash': gcashTotal,
       },
       'orderTypes': {
-        'Dine-in': dineInCount,
+        'Dine in': dineInCount,
         'Pickup': pickupCount,
       },
     };
@@ -434,7 +434,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       final data = doc.data();
       final orderType = data['orderType'] as String?;
 
-      if (orderType == 'Dine-in') {
+      if (orderType == 'Dine in') {
         dineInCount++;
       } else if (orderType == 'Pickup') {
         pickupCount++;
@@ -442,7 +442,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     }
 
     return [
-      {'type': 'Dine-in', 'count': dineInCount},
+      {'type': 'Dine in', 'count': dineInCount},
       {'type': 'Pickup', 'count': pickupCount},
     ];
   }
@@ -985,7 +985,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                     sectionsSpace: 2,
                                     centerSpaceRadius: 60,
                                     sections: data.map((item) {
-                                      final color = item['type'] == 'Dine-in'
+                                      final color = item['type'] == 'Dine in'
                                           ? Colors.orange
                                           : Colors.purple;
                                       final count = item['count'] as int;
@@ -1027,7 +1027,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _buildLegendItem('Dine-in', Colors.orange),
+                              _buildLegendItem('Dine in', Colors.orange),
                               const SizedBox(width: 20),
                               _buildLegendItem('Pickup', Colors.purple),
                             ],
@@ -1125,7 +1125,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                       'Cash': 0.0,
                                       'GCash': 0.0
                                     },
-                                    'orderTypes': {'Dine-in': 0, 'Pickup': 0}
+                                    'orderTypes': {'Dine in': 0, 'Pickup': 0}
                                   };
                               final paymentMethods = breakdown['paymentMethods']
                                   as Map<String, dynamic>;
@@ -1179,8 +1179,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                     children: [
                                       Expanded(
                                         child: _buildOrderTypeCard(
-                                          title: 'Dine-in',
-                                          count: orderTypes['Dine-in'] as int,
+                                          title: 'Dine in',
+                                          count: orderTypes['Dine in'] as int,
                                           icon: Icons.restaurant,
                                           color: Colors.orange,
                                         ),

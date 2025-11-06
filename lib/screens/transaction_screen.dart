@@ -13,7 +13,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:csv/csv.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:file_saver/file_saver.dart';
 
 // Added: Import for date picker widget
 import 'package:kaffi_cafe_pos/widgets/date_picker_widget.dart';
@@ -144,7 +144,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                             pw.Text(item['quantity'].toString(),
                                 textAlign: pw.TextAlign.center),
                             pw.Text(
-                                '₱${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
                                 textAlign: pw.TextAlign.right),
                           ],
                         )),
@@ -159,7 +159,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     pw.Text('TOTAL:',
                         style: pw.TextStyle(
                             fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                    pw.Text('₱${data['total'].toStringAsFixed(2)}',
+                    pw.Text('P${data['total'].toStringAsFixed(2)}',
                         style: pw.TextStyle(
                             fontSize: 16, fontWeight: pw.FontWeight.bold)),
                   ],
@@ -287,7 +287,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                             ),
                             TextWidget(
                               text:
-                                  '₱${(item['price'] * item['quantity']).toStringAsFixed(2)}',
+                                  'P${(item['price'] * item['quantity']).toStringAsFixed(2)}',
                               fontSize: 14,
                               fontFamily: 'Regular',
                               color: Colors.grey[800],
@@ -308,7 +308,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                         ),
                         TextWidget(
                           text:
-                              '₱${transactionData['total'].toStringAsFixed(2)}',
+                              'P${transactionData['total'].toStringAsFixed(2)}',
                           fontSize: 16,
                           fontFamily: 'Bold',
                           color: AppTheme.primaryColor,
@@ -410,7 +410,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        totalAmount += data['totalAmount'] ?? 0;
+        // Fixed: Use 'total' instead of 'totalAmount' for consistency
+        totalAmount += data['total'] ?? 0.0;
         final items = data['items'] as List<dynamic>;
         totalItems += items.length;
       }
@@ -429,7 +430,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         ['TRANSACTION SUMMARY'],
         ['Total Transactions', totalTransactions],
         ['Total Items Sold', totalItems],
-        ['Total Revenue', '₱${totalAmount.toStringAsFixed(2)}'],
+        ['Total Revenue', 'P${totalAmount.toStringAsFixed(2)}'],
         [],
         // Transactions detail header
         ['TRANSACTION DETAILS'],
@@ -461,8 +462,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
             data['orderId'] ?? '',
             item['name'] ?? '',
             item['quantity'] ?? 0,
-            '₱${(item['price'] as double).toStringAsFixed(2)}',
-            '₱${subtotal.toStringAsFixed(2)}',
+            'P${(item['price'] as double).toStringAsFixed(2)}',
+            'P${subtotal.toStringAsFixed(2)}',
             orderDate,
             customer,
             paymentMethod,
@@ -482,24 +483,28 @@ class _TransactionScreenState extends State<TransactionScreen> {
       ]);
 
       final csvString = const ListToCsvConverter().convert(csvData);
-      final bytes = utf8.encode(csvString);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download',
-            'kaffi_cafe_transactions_${DateFormat('yyyyMMdd').format(_selectedDay!)}.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      final fileName =
+          'kaffi_cafe_transactions_${DateFormat('yyyyMMdd').format(_selectedDay!)}.csv';
+
+      String? savedPath = await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: utf8.encode(csvString),
+        ext: 'csv',
+        mimeType: MimeType.csv,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Transaction report exported to CSV successfully',
+            text: savedPath != null
+                ? 'Transaction report saved to: $savedPath'
+                : 'Transaction report exported to CSV successfully',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
           ),
           backgroundColor: AppTheme.primaryColor,
+          duration: Duration(seconds: 5),
         ),
       );
     } catch (e) {
@@ -547,7 +552,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        totalAmount += data['totalAmount'] ?? 0;
+        // Fixed: Use 'total' instead of 'totalAmount' for consistency
+        totalAmount += data['total'] ?? 0.0;
         final items = data['items'] as List<dynamic>;
         totalItems += items.length;
       }
@@ -625,7 +631,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text('Total Revenue:'),
-                          pw.Text('₱${totalAmount.toStringAsFixed(2)}',
+                          pw.Text('P${totalAmount.toStringAsFixed(2)}',
                               style:
                                   pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         ],
@@ -732,7 +738,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                             pw.Container(
                               padding: const pw.EdgeInsets.all(5),
                               child: pw.Text(
-                                  '₱${data['totalAmount'].toStringAsFixed(2)}',
+                                  'P${(data['total'] ?? 0.0).toStringAsFixed(2)}',
                                   style: const pw.TextStyle(fontSize: 9)),
                             ),
                           ],
@@ -826,10 +832,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
       // Group transactions by day
       Map<String, List<Map<String, dynamic>>> dailyTransactions = {};
+      List<Map<String, dynamic>> allTransactions = [];
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        totalAmount += data['totalAmount'] ?? 0;
+        // Fixed: Use 'total' instead of 'totalAmount' for consistency
+        totalAmount += data['total'] ?? 0.0;
         final items = data['items'] as List<dynamic>;
         totalItems += items.length;
 
@@ -838,6 +846,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
           dailyTransactions[day] = [];
         }
         dailyTransactions[day]!.add(data);
+        allTransactions.add(data);
       }
 
       pdf.addPage(
@@ -873,19 +882,22 @@ class _TransactionScreenState extends State<TransactionScreen> {
           footer: (pw.Context context) {
             return pw.Container(
               child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
                   pw.Divider(thickness: 1),
                   pw.SizedBox(height: 10),
-                  pw.Text('Prepared by: Administrator',
-                      style: pw.TextStyle(
-                          fontSize: 10, fontStyle: pw.FontStyle.italic)),
-                  pw.SizedBox(height: 5),
-                  pw.Text('This is a system-generated report',
-                      style: const pw.TextStyle(fontSize: 8)),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                      style: const pw.TextStyle(fontSize: 8)),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Prepared by: Administrator',
+                          style: pw.TextStyle(
+                              fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                      pw.Text('System Generated',
+                          style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                          'Page ${context.pageNumber} of ${context.pagesCount}',
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ],
+                  ),
                 ],
               ),
             );
@@ -930,7 +942,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
                         pw.Text('Total Revenue:'),
-                        pw.Text('₱${totalAmount.toStringAsFixed(2)}',
+                        pw.Text('P${totalAmount.toStringAsFixed(2)}',
                             style:
                                 pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       ],
@@ -994,7 +1006,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
                     for (var transaction in dayTransactions) {
                       final data = transaction as Map<String, dynamic>;
-                      dayRevenue += data['totalAmount'] ?? 0;
+                      // Fixed: Use 'total' instead of 'totalAmount' for consistency
+                      dayRevenue += data['total'] ?? 0.0;
                       final items = data['items'] as List<dynamic>;
                       dayItems += items.length;
                     }
@@ -1018,8 +1031,108 @@ class _TransactionScreenState extends State<TransactionScreen> {
                         ),
                         pw.Container(
                           padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('₱${dayRevenue.toStringAsFixed(2)}',
+                          child: pw.Text('P${dayRevenue.toStringAsFixed(2)}',
                               style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+
+              // Detailed Transactions Section
+              pw.SizedBox(height: 20),
+              pw.Text('DETAILED TRANSACTIONS',
+                  style: pw.TextStyle(
+                      fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                columnWidths: {
+                  0: const pw.FractionColumnWidth(0.15), // Order ID
+                  1: const pw.FractionColumnWidth(0.25), // Customer
+                  2: const pw.FractionColumnWidth(0.25), // Items
+                  3: const pw.FractionColumnWidth(0.15), // Time
+                  4: const pw.FractionColumnWidth(0.2), // Total
+                },
+                children: [
+                  // Table Header
+                  pw.TableRow(
+                    decoration:
+                        const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Order ID',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Customer',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Items',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Time',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text('Total',
+                            style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      ),
+                    ],
+                  ),
+                  // Table Rows - All transactions
+                  ...allTransactions.map((data) {
+                    final items = data['items'] as List<dynamic>;
+                    final itemsText = items
+                            .map((item) =>
+                                '${item['name']}(${item['quantity']})')
+                            .take(2)
+                            .join(', ') +
+                        (items.length > 2 ? '...' : '');
+
+                    return pw.TableRow(
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(data['orderId'] ?? '',
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(data['buyer'] ?? 'N/A',
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(itemsText,
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(
+                              DateFormat('HH:mm')
+                                  .format(data['timestamp'].toDate()),
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(
+                              'P${(data['total'] ?? 0.0).toStringAsFixed(2)}',
+                              style: const pw.TextStyle(fontSize: 9)),
                         ),
                       ],
                     );
@@ -1087,10 +1200,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
       // Group transactions by day
       Map<String, List<Map<String, dynamic>>> dailyTransactions = {};
+      List<Map<String, dynamic>> allTransactions = [];
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        totalAmount += data['totalAmount'] ?? 0;
+        // Fixed: Use 'total' instead of 'totalAmount' for consistency
+        totalAmount += data['total'] ?? 0.0;
         final items = data['items'] as List<dynamic>;
         totalItems += items.length;
 
@@ -1099,6 +1214,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
           dailyTransactions[day] = [];
         }
         dailyTransactions[day]!.add(data);
+        allTransactions.add(data);
       }
 
       List<List<dynamic>> csvData = [
@@ -1115,7 +1231,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         ['MONTHLY SUMMARY'],
         ['Total Transactions', totalTransactions],
         ['Total Items Sold', totalItems],
-        ['Total Revenue', '₱${totalAmount.toStringAsFixed(2)}'],
+        ['Total Revenue', 'P${totalAmount.toStringAsFixed(2)}'],
         [],
         // Daily breakdown header
         ['DAILY BREAKDOWN'],
@@ -1130,7 +1246,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
         for (var transaction in dayTransactions) {
           final data = transaction as Map<String, dynamic>;
-          dayRevenue += data['totalAmount'] ?? 0;
+          // Fixed: Use 'total' instead of 'totalAmount' for consistency
+          dayRevenue += data['total'] ?? 0.0;
           final items = data['items'] as List<dynamic>;
           dayItems += items.length;
         }
@@ -1139,8 +1256,48 @@ class _TransactionScreenState extends State<TransactionScreen> {
           entry.key,
           dayTransactions.length,
           dayItems,
-          '₱${dayRevenue.toStringAsFixed(2)}',
+          'P${dayRevenue.toStringAsFixed(2)}',
         ]);
+      }
+
+      // Add detailed transactions section
+      csvData.addAll([
+        [],
+        ['DETAILED TRANSACTIONS'],
+        [
+          'Order ID',
+          'Item',
+          'Quantity',
+          'Price',
+          'Subtotal',
+          'Date',
+          'Customer',
+          'Payment Method'
+        ],
+      ]);
+
+      // Add all transaction details
+      for (var data in allTransactions) {
+        final items = data['items'] as List<dynamic>;
+        final orderDate =
+            DateFormat('MMM dd, yyyy HH:mm').format(data['timestamp'].toDate());
+        final customer = data['buyer'] ?? 'N/A';
+        final paymentMethod = data['paymentMethod'] ?? 'N/A';
+
+        for (var item in items) {
+          final subtotal =
+              (item['price'] as double) * (item['quantity'] as int);
+          csvData.add([
+            data['orderId'] ?? '',
+            item['name'] ?? '',
+            item['quantity'] ?? 0,
+            'P${(item['price'] as double).toStringAsFixed(2)}',
+            'P${subtotal.toStringAsFixed(2)}',
+            orderDate,
+            customer,
+            paymentMethod,
+          ]);
+        }
       }
 
       // Footer section
@@ -1155,24 +1312,28 @@ class _TransactionScreenState extends State<TransactionScreen> {
       ]);
 
       final csvString = const ListToCsvConverter().convert(csvData);
-      final bytes = utf8.encode(csvString);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download',
-            'kaffi_cafe_monthly_transactions_${DateFormat('yyyyMM').format(now)}.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      final fileName =
+          'kaffi_cafe_monthly_transactions_${DateFormat('yyyyMM').format(now)}.csv';
+
+      String? savedPath = await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: utf8.encode(csvString),
+        ext: 'csv',
+        mimeType: MimeType.csv,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
-            text: 'Monthly transaction report exported to CSV successfully',
+            text: savedPath != null
+                ? 'Monthly report saved to: $savedPath'
+                : 'Monthly transaction report exported to CSV successfully',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.white,
           ),
           backgroundColor: AppTheme.primaryColor,
+          duration: Duration(seconds: 5),
         ),
       );
     } catch (e) {
@@ -1322,7 +1483,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                               _buildSummaryRow(
                                   'Total Items', totalItems.toString()),
                               _buildSummaryRow('Total Amount',
-                                  '₱${totalAmount.toStringAsFixed(2)}'),
+                                  'P${totalAmount.toStringAsFixed(2)}'),
                             ],
                           );
                         },
@@ -1347,57 +1508,52 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  ButtonWidget(
-                                    width: 125,
-                                    radius: 8,
-                                    color: AppTheme.primaryColor,
-                                    textColor: Colors.white,
-                                    label: 'Print Summary',
-                                    onPressed: _printTransactionSummary,
-                                    fontSize: 12,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ButtonWidget(
-                                    width: 125,
-                                    radius: 8,
-                                    color: AppTheme.primaryColor,
-                                    textColor: Colors.white,
-                                    label: 'Export CSV',
-                                    onPressed: _exportToCSV,
-                                    fontSize: 12,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  ButtonWidget(
-                                    width: 125,
-                                    radius: 8,
-                                    color: Colors.green,
-                                    textColor: Colors.white,
-                                    label: 'Monthly PDF',
-                                    onPressed: _printMonthlyTransactions,
-                                    fontSize: 12,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ButtonWidget(
-                                    width: 125,
-                                    radius: 8,
-                                    color: Colors.green,
-                                    textColor: Colors.white,
-                                    label: 'Monthly CSV',
-                                    onPressed: _exportMonthlyToCSV,
-                                    fontSize: 12,
-                                  ),
-                                ],
-                              ),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                ButtonWidget(
+                                  width: 125,
+                                  radius: 8,
+                                  color: AppTheme.primaryColor,
+                                  textColor: Colors.white,
+                                  label: 'Print Summary',
+                                  onPressed: _printTransactionSummary,
+                                  fontSize: 12,
+                                ),
+                                const SizedBox(width: 8),
+                                ButtonWidget(
+                                  width: 125,
+                                  radius: 8,
+                                  color: AppTheme.primaryColor,
+                                  textColor: Colors.white,
+                                  label: 'Export CSV',
+                                  onPressed: _exportToCSV,
+                                  fontSize: 12,
+                                ),
+                                const SizedBox(width: 8),
+                                ButtonWidget(
+                                  width: 125,
+                                  radius: 8,
+                                  color: Colors.green,
+                                  textColor: Colors.white,
+                                  label: 'Monthly PDF',
+                                  onPressed: _printMonthlyTransactions,
+                                  fontSize: 12,
+                                ),
+                                const SizedBox(width: 8),
+                                ButtonWidget(
+                                  width: 125,
+                                  radius: 8,
+                                  color: Colors.green,
+                                  textColor: Colors.white,
+                                  label: 'Monthly CSV',
+                                  onPressed: _exportMonthlyToCSV,
+                                  fontSize: 12,
+                                ),
+                              ],
+                            ),
                           ),
                           SizedBox(
                             height: 10,
@@ -1701,7 +1857,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextWidget(
-            text: '₱${(price * quantity).toStringAsFixed(2)}',
+            text: 'P${(price * quantity).toStringAsFixed(2)}',
             fontSize: 14,
             fontFamily: 'Regular',
             color: Colors.grey[800],

@@ -1453,11 +1453,16 @@ class _HomeScreenState extends State<HomeScreen>
                                                   ),
                                                 ),
                                           const SizedBox(height: 12),
-                                          TextWidget(
-                                            text: data['name'] ?? 'Unnamed',
-                                            fontSize: 16,
-                                            fontFamily: 'Medium',
-                                            color: Colors.grey[800],
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                left: 5, right: 5),
+                                            child: TextWidget(
+                                              align: TextAlign.center,
+                                              text: data['name'] ?? 'Unnamed',
+                                              fontSize: 16,
+                                              fontFamily: 'Medium',
+                                              color: Colors.grey[800],
+                                            ),
                                           ),
                                           TextWidget(
                                             text:
