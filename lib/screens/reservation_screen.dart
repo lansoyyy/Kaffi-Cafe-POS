@@ -125,6 +125,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
             setState(() {
               _tableReservations = reservations;
             });
+            
+            // Check for any reservations that might have ended
+            _checkAndUpdateEndedReservations(reservations);
           }
         });
   }
@@ -133,7 +136,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
   void _startReservationExpiryMonitoring() {
     _reservationExpiryTimer?.cancel();
     _reservationExpiryTimer =
-        Timer.periodic(const Duration(minutes: 5), (timer) {
+        Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkReservationExpiry();
     });
   }
@@ -142,26 +145,30 @@ class _ReservationScreenState extends State<ReservationScreen> {
   Future<void> _checkReservationExpiry() async {
     try {
       final now = DateTime.now();
+      final today = DateFormat('yyyy-MM-dd').format(now);
+      
+      // Get all active reservations for today
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
-          .where('branch', isEqualTo: _currentBranch)
-          .where('status', isEqualTo: 'confirmed')
+          .where('date', isEqualTo: today)
+          .where('status', whereIn: ['confirmed', 'checked_in'])
           .get();
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final reservation = data['reservation'] as Map<String, dynamic>;
-
+        
         // Parse reservation date and time
-        final String dateStr = reservation['date'];
-        final String timeStr = reservation['time'];
+        final String dateStr = data['date'] ?? '';
+        final String timeStr = data['timeSlot'] ?? data['time'] ?? '';
 
-        // Convert to DateTime for comparison
-        final List<String> dateParts = dateStr.split('/');
+        if (dateStr.isEmpty || timeStr.isEmpty) continue;
+
+        // Parse date (yyyy-MM-dd format)
+        final List<String> dateParts = dateStr.split('-');
         final DateTime reservationDate = DateTime(
-          int.parse(dateParts[2]), // year
+          int.parse(dateParts[0]), // year
           int.parse(dateParts[1]), // month
-          int.parse(dateParts[0]), // day
+          int.parse(dateParts[2]), // day
         );
 
         // Parse time (format: "7:00 AM" or "7:00 PM")
@@ -171,10 +178,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
         final int minute = int.parse(hourMinute[1]);
 
         // Convert to 24-hour format
-        if (timeParts[1] == 'PM' && hour != 12) {
-          hour += 12;
-        } else if (timeParts[1] == 'AM' && hour == 12) {
-          hour = 0;
+        if (timeParts.length > 1) {
+          if (timeParts[1] == 'PM' && hour != 12) {
+            hour += 12;
+          } else if (timeParts[1] == 'AM' && hour == 12) {
+            hour = 0;
+          }
         }
 
         final DateTime reservationDateTime = DateTime(
@@ -185,15 +194,22 @@ class _ReservationScreenState extends State<ReservationScreen> {
           minute,
         );
 
-        // Check if reservation is more than 1 hour old
-        if (now.difference(reservationDateTime).inHours >= 1) {
-          // Update reservation status to expired
+        // Calculate end time (reservation time + 55 minutes)
+        final DateTime endTime = reservationDateTime.add(const Duration(minutes: 55));
+
+        // Check if reservation time has ended
+        if (now.isAfter(endTime)) {
+          // Update reservation status to completed
           await _firestore.collection('reservations').doc(doc.id).update({
-            'status': 'expired',
+            'status': 'completed',
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
       }
+      
+      // Refresh table reservations after updating statuses
+      await _loadTableReservations();
+      await _loadActiveReservations();
     } catch (e) {
       print('Error checking reservation expiry: $e');
     }
@@ -208,8 +224,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
     // Check if table has active reservation
     if (_tableReservations.containsKey(tableId)) {
       final reservation = _tableReservations[tableId];
-      if (reservation['status'] == 'confirmed') {
-        return 'Reserved';
+      final String status = reservation['status'] ?? '';
+      
+      // Only consider table reserved if status is confirmed or checked_in
+      // and the reservation time hasn't ended
+      if (status == 'confirmed' || status == 'checked_in') {
+        // Check if reservation time has ended
+        if (!_isReservationTimeEnded(reservation)) {
+          return 'Reserved';
+        }
       }
     }
 
@@ -937,6 +960,63 @@ class _ReservationScreenState extends State<ReservationScreen> {
       return now.isAfter(reservationTime) && now.isBefore(endTime);
     } catch (e) {
       return false;
+    }
+  }
+
+  // Check if reservation time has ended
+  bool _isReservationTimeEnded(Map<String, dynamic> reservation) {
+    try {
+      final dateStr = reservation['date'];
+      final timeStr = reservation['timeSlot'] ?? reservation['time'];
+
+      if (dateStr == null || timeStr == null) return true;
+
+      // Parse date (yyyy-MM-dd)
+      final dateParts = dateStr.split('-');
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      // Parse time (e.g., "7:00 AM")
+      final timeParts = timeStr.split(' ');
+      final hourMin = timeParts[0].split(':');
+      int hour = int.parse(hourMin[0]);
+      final minute = int.parse(hourMin[1]);
+
+      // Convert to 24-hour format
+      if (timeParts.length > 1) {
+        if (timeParts[1] == 'PM' && hour != 12) {
+          hour += 12;
+        } else if (timeParts[1] == 'AM' && hour == 12) {
+          hour = 0;
+        }
+      }
+
+      final reservationTime = DateTime(year, month, day, hour, minute);
+      final endTime = reservationTime.add(const Duration(minutes: 55));
+      final now = DateTime.now();
+
+      return now.isAfter(endTime);
+    } catch (e) {
+      print('Error checking if reservation time ended: $e');
+      return true; // Assume ended if there's an error
+    }
+  }
+
+  // Check and update reservations that have ended
+  void _checkAndUpdateEndedReservations(Map<String, dynamic> reservations) {
+    final now = DateTime.now();
+    bool needsUpdate = false;
+    
+    reservations.forEach((tableId, reservation) {
+      if (_isReservationTimeEnded(reservation)) {
+        needsUpdate = true;
+      }
+    });
+    
+    if (needsUpdate) {
+      // Trigger a check for expired reservations
+      _checkReservationExpiry();
     }
   }
 
