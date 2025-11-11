@@ -33,6 +33,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
   bool _isTableManagementMode = false;
   Map<String, bool> _tableEnabledStatus = {};
   Map<String, dynamic> _tableReservations = {};
+  Map<String, String> _tableDisableReasons = {};
   Timer? _reservationExpiryTimer;
   StreamSubscription? _reservationsListener;
 
@@ -69,6 +70,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
     for (var table in _tables) {
       _tableAvailability[table['id']] = true;
       _tableEnabledStatus[table['id']] = true;
+      _tableDisableReasons[table['id']] = '';
     }
 
     // Generate available time slots based on operating hours
@@ -88,6 +90,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
     // Load reservation history
     _loadReservationHistory();
+
+    // Load table disable reasons
+    _loadTableDisableReasons();
 
     setState(() {
       _isLoading = false;
@@ -239,27 +244,29 @@ class _ReservationScreenState extends State<ReservationScreen> {
     return 'Available';
   }
 
-  // Toggle table enabled/disabled status
-  Future<void> _toggleTableStatus(String tableId) async {
+  // Toggle table enabled/disabled status with reason
+  Future<void> _toggleTableStatus(
+      String tableId, bool newStatus, String reason) async {
     try {
-      final newStatus = !_tableEnabledStatus[tableId]!;
-
       // Update local state
       setState(() {
         _tableEnabledStatus[tableId] = newStatus;
+        _tableDisableReasons[tableId] = newStatus ? '' : reason;
       });
 
       // Update in Firestore
       await _firestore.collection('tables').doc(tableId).set({
         'enabled': newStatus,
+        'disableReason': newStatus ? '' : reason,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      final tableName = _tables.firstWhere((t) => t['id'] == tableId)['name'];
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: TextWidget(
             text:
-                'Table ${_tables.firstWhere((t) => t['id'] == tableId)['name']} ${newStatus ? 'enabled' : 'disabled'}',
+                'Table $tableName ${newStatus ? 'enabled' : 'disabled'}${!newStatus ? ': $reason' : ''}',
             fontSize: 14,
             color: plainWhite,
             fontFamily: 'Regular',
@@ -285,6 +292,119 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ),
       );
     }
+  }
+
+  // Load table disable reasons from Firestore
+  Future<void> _loadTableDisableReasons() async {
+    try {
+      for (var table in _tables) {
+        final docSnapshot =
+            await _firestore.collection('tables').doc(table['id']).get();
+        if (docSnapshot.exists) {
+          final data = docSnapshot.data() as Map<String, dynamic>;
+          setState(() {
+            _tableEnabledStatus[table['id']] = data['enabled'] ?? true;
+            _tableDisableReasons[table['id']] = data['disableReason'] ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading table disable reasons: $e');
+    }
+  }
+
+  // Show dialog to input disable reason
+  Future<void> _showDisableReasonDialog(
+      String tableId, String tableName) async {
+    final TextEditingController reasonController = TextEditingController();
+    bool isDisabling = _tableEnabledStatus[tableId] ?? true;
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: plainWhite,
+        title: TextWidget(
+          text: isDisabling ? 'Disable Table' : 'Enable Table',
+          fontSize: 20,
+          color: textBlack,
+          isBold: true,
+          fontFamily: 'Bold',
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextWidget(
+              text: isDisabling
+                  ? 'Please provide a reason for disabling $tableName:'
+                  : 'Are you sure you want to enable $tableName?',
+              fontSize: 16,
+              color: textBlack,
+              fontFamily: 'Regular',
+            ),
+            if (isDisabling) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: ashGray),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppTheme.primaryColor),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          ButtonWidget(
+            label: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(),
+            color: ashGray,
+            textColor: textBlack,
+            fontSize: 14,
+            height: 40,
+            width: 100,
+            radius: 10,
+          ),
+          ButtonWidget(
+            label: isDisabling ? 'Disable' : 'Enable',
+            onPressed: () async {
+              Navigator.of(context).pop();
+              if (isDisabling && reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: TextWidget(
+                      text: 'Please provide a reason for disabling the table',
+                      fontSize: 14,
+                      color: plainWhite,
+                      fontFamily: 'Regular',
+                    ),
+                    backgroundColor: festiveRed,
+                  ),
+                );
+                return;
+              }
+              await _toggleTableStatus(tableId, isDisabling ? false : true,
+                  reasonController.text.trim());
+            },
+            color: isDisabling ? festiveRed : palmGreen,
+            textColor: plainWhite,
+            fontSize: 14,
+            height: 40,
+            width: 100,
+            radius: 10,
+          ),
+        ],
+      ),
+    );
   }
 
   // Load table reservations for today
@@ -1409,7 +1529,37 @@ class _ReservationScreenState extends State<ReservationScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            // Table management hint
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border:
+                    Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppTheme.primaryColor,
+                    size: fontSize * 1.2,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextWidget(
+                      text:
+                          'Long press on any table to enable/disable it. Disabled tables will show a reason and cannot be reserved.',
+                      fontSize: fontSize - 1,
+                      color: AppTheme.primaryColor,
+                      fontFamily: 'Medium',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Tables grid with modern cards
             Expanded(
@@ -1494,6 +1644,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           child: InkWell(
                             onTap: () => _showTableReservationDetails(
                                 context, table, reservation),
+                            onLongPress: () => _showDisableReasonDialog(
+                                table['id'], table['name']),
                             borderRadius: BorderRadius.circular(20),
                             child: Padding(
                               padding: const EdgeInsets.all(20.0),
@@ -1621,6 +1773,57 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                         ),
                                       ),
                                     ),
+                                    // Show disable reason if table is disabled
+                                    if (!isEnabled &&
+                                        _tableDisableReasons[table['id']]
+                                                ?.isNotEmpty ==
+                                            true) ...[
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: festiveRed.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color:
+                                                  festiveRed.withOpacity(0.3)),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.info,
+                                                  size: fontSize - 2,
+                                                  color: festiveRed,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                TextWidget(
+                                                  text: 'Disabled',
+                                                  fontSize: fontSize - 2,
+                                                  color: festiveRed,
+                                                  isBold: true,
+                                                  fontFamily: 'Bold',
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            TextWidget(
+                                              text: _tableDisableReasons[
+                                                      table['id']] ??
+                                                  '',
+                                              fontSize: fontSize - 2,
+                                              color: festiveRed,
+                                              fontFamily: 'Regular',
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                     if (reservation != null) ...[
                                       const SizedBox(height: 12),
                                       Container(

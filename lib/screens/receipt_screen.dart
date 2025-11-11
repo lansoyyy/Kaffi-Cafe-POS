@@ -3,12 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
+import 'package:kaffi_cafe_pos/utils/role_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReceiptScreen extends StatefulWidget {
   const ReceiptScreen({super.key});
@@ -37,6 +39,19 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Get current staff name
+  Future<String> _getCurrentStaffName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final staffName = prefs.getString('current_staff_name') ?? '';
+    final isSuperAdmin = await RoleService.isSuperAdmin();
+
+    // Return empty string if admin, otherwise return staff name
+    if (isSuperAdmin) {
+      return '';
+    }
+    return staffName;
   }
 
   void _selectDateRange(BuildContext context) async {
@@ -145,6 +160,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
   Future<void> _printReceipt(Map<String, dynamic> receipt) async {
     final pdf = pw.Document();
+
+    // Get current staff name
+    final staffName = await _getCurrentStaffName();
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80,
@@ -162,6 +181,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   style: const pw.TextStyle(fontSize: 10)),
               pw.Text('Customer: ${receipt['buyer']}',
                   style: const pw.TextStyle(fontSize: 10)),
+              // Only show staff name if not admin
+              if (staffName.isNotEmpty) ...[
+                pw.Text('Served by: $staffName',
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
               pw.SizedBox(height: 10),
               pw.Text('Items:',
                   style: pw.TextStyle(

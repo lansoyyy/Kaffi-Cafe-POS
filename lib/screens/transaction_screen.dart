@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/utils/branch_service.dart';
+import 'package:kaffi_cafe_pos/utils/role_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -65,6 +67,17 @@ class _TransactionScreenState extends State<TransactionScreen> {
     }
   }
 
+  // Method to get current staff name
+  Future<String> _getCurrentStaffName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final staffName = prefs.getString('staffName') ?? '';
+      return staffName;
+    } catch (e) {
+      return '';
+    }
+  }
+
   // Modified: Changed from delete to print receipt
   Future<void> _printReceipt(String orderId, String itemName,
       Map<String, dynamic> transactionData) async {
@@ -72,6 +85,10 @@ class _TransactionScreenState extends State<TransactionScreen> {
     try {
       final data = transactionData;
       final items = data['items'] as List<dynamic>;
+
+      // Get current staff name
+      final staffName = await _getCurrentStaffName();
+      final isAdmin = await RoleService.isSuperAdmin();
 
       pdf.addPage(
         pw.Page(
@@ -164,6 +181,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
                             fontSize: 16, fontWeight: pw.FontWeight.bold)),
                   ],
                 ),
+
+                // Only show staff name if not admin
+                if (!isAdmin && staffName.isNotEmpty) ...[
+                  pw.SizedBox(height: 10),
+                  pw.Text('Served by: $staffName',
+                      style: const pw.TextStyle(fontSize: 10)),
+                ],
+
                 pw.SizedBox(height: 20),
                 pw.Text('Thank you for your purchase!',
                     style: const pw.TextStyle(fontSize: 12)),

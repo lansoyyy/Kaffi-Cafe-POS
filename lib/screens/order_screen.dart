@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
 import 'package:kaffi_cafe_pos/utils/app_theme.dart';
 import 'package:kaffi_cafe_pos/utils/branch_service.dart';
+import 'package:kaffi_cafe_pos/utils/role_service.dart';
 import 'package:kaffi_cafe_pos/widgets/drawer_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/text_widget.dart';
 import 'package:kaffi_cafe_pos/widgets/button_widget.dart';
@@ -10,6 +11,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({super.key});
@@ -81,6 +83,19 @@ class _OrderScreenState extends State<OrderScreen>
         });
       }
     }
+  }
+
+  // Get current staff name
+  Future<String> _getCurrentStaffName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final staffName = prefs.getString('current_staff_name') ?? '';
+    final isSuperAdmin = await RoleService.isSuperAdmin();
+
+    // Return empty string if admin, otherwise return staff name
+    if (isSuperAdmin) {
+      return '';
+    }
+    return staffName;
   }
 
   // Dialog for adding a new order
@@ -516,6 +531,9 @@ class _OrderScreenState extends State<OrderScreen>
       Map<String, dynamic> orderData) async {
     final pdf = pw.Document();
 
+    // Get current staff name
+    final staffName = await _getCurrentStaffName();
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80,
@@ -538,6 +556,11 @@ class _OrderScreenState extends State<OrderScreen>
               pw.SizedBox(height: 15),
               pw.Text('Buyer: ${orderData['buyer']}',
                   style: const pw.TextStyle(fontSize: 10)),
+              // Only show staff name if not admin
+              if (staffName.isNotEmpty) ...[
+                pw.Text('Served by: $staffName',
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
               pw.SizedBox(height: 15),
               pw.Divider(),
               ...(orderData['items'] as List<dynamic>)
@@ -1784,10 +1807,28 @@ class _OrderScreenState extends State<OrderScreen>
                         radius: 8,
                         color: Colors.orange,
                         textColor: Colors.white,
-                        label: 'Mark Unclaimed',
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _deleteOrder(order.id);
+                        label: 'Print Receipt',
+                        onPressed: () async {
+                          try {
+                            final pdf = await _generateReceiptPdf(data);
+                            await Printing.layoutPdf(
+                                onLayout: (PdfPageFormat format) async =>
+                                    pdf.save());
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: TextWidget(
+                                    text: 'Error printing receipt: $e',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.white,
+                                  ),
+                                  backgroundColor: Colors.red[600],
+                                ),
+                              );
+                            }
+                          }
                         },
                         fontSize: 14,
                         width: 140,
