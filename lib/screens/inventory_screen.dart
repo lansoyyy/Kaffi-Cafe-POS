@@ -39,6 +39,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
     'Non-Coffee Drinks',
     'Pastries',
     'Sandwiches',
+    'Frappe',
+    'Cloud Series',
+    'Milk Tea',
+    'Fruit Tea',
+    'Croffle',
+    'Pasta',
     'Add-ons'
   ];
 
@@ -396,6 +402,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       'Non-Coffee Drinks',
                       'Pastries',
                       'Sandwiches',
+                      'Frappe',
+                      'Cloud Series',
+                      'Milk Tea',
+                      'Fruit Tea',
+                      'Croffle',
+                      'Pasta',
                       'Add-ons'
                     ].map((category) {
                       return DropdownMenuItem(
@@ -635,6 +647,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
       case 'Pastries':
         return Icons.cake;
       case 'Sandwiches':
+        return Icons.lunch_dining;
+      case 'Frappe':
+        return Icons.local_cafe;
+      case 'Cloud Series':
+        return Icons.local_bar;
+      case 'Milk Tea':
+        return Icons.local_cafe;
+      case 'Fruit Tea':
+        return Icons.local_cafe;
+      case 'Croffle':
+        return Icons.cake;
+      case 'Pasta':
         return Icons.lunch_dining;
       case 'Add-ons':
         return Icons.add_shopping_cart;

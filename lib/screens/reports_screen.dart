@@ -447,6 +447,85 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     ];
   }
 
+  // Methods for fetching best sellers data
+  Future<List<Map<String, dynamic>>> _getBestSellersData(String period) async {
+    final now = DateTime.now();
+    DateTime startDate, endDate;
+
+    switch (period) {
+      case 'Daily':
+        startDate = DateTime(now.year, now.month, now.day);
+        endDate = DateTime(now.year, now.month, now.day + 1);
+        break;
+      case 'Weekly':
+        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+        startDate = startOfWeek;
+        endDate = startOfWeek.add(Duration(days: 7));
+        break;
+      case 'Monthly':
+        startDate = DateTime(now.year, now.month, 1);
+        endDate = DateTime(now.year, now.month + 1, 1);
+        break;
+      default:
+        startDate = DateTime(now.year, now.month, now.day);
+        endDate = DateTime(now.year, now.month, now.day + 1);
+    }
+
+    final snapshot = await _firestore
+        .collection('orders')
+        .where('branch', isEqualTo: _currentBranch)
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .get();
+
+    Map<String, Map<String, dynamic>> itemSales = {};
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final items = data['items'] as List<dynamic>;
+
+      for (var item in items) {
+        final itemName = item['name'] as String;
+        final quantity = item['quantity'] as int;
+        final price = (item['price'] as num).toDouble();
+        final total = price * quantity;
+
+        if (itemSales.containsKey(itemName)) {
+          itemSales[itemName]!['quantity'] += quantity;
+          itemSales[itemName]!['total'] += total;
+        } else {
+          itemSales[itemName] = {
+            'name': itemName,
+            'quantity': quantity,
+            'price': price,
+            'total': total,
+          };
+        }
+      }
+    }
+
+    // Sort by quantity and get top 5
+    final sortedItems = itemSales.values.toList()
+      ..sort((a, b) => b['quantity'].compareTo(a['quantity']));
+
+    return sortedItems.take(5).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> _getBestSellersForChart(
+      String period) async {
+    final bestSellers = await _getBestSellersData(period);
+
+    // Convert to chart format
+    return bestSellers
+        .map((item) => {
+              'name': item['name'],
+              'quantity': item['quantity'],
+              'total': item['total'],
+            })
+        .toList();
+  }
+
   void _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -1394,6 +1473,347 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               ],
             ),
             const SizedBox(height: 20),
+            // Best Sellers Section
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextWidget(
+                          text: 'Top 5 Best Sellers',
+                          fontSize: 18,
+                          fontFamily: 'Bold',
+                          color: AppTheme.primaryColor,
+                          isBold: true,
+                        ),
+                        DropdownButton<String>(
+                          value: _selectedPeriod == 'Custom'
+                              ? 'Daily'
+                              : _selectedPeriod,
+                          items: ['Daily', 'Weekly', 'Monthly'].map((period) {
+                            return DropdownMenuItem(
+                              value: period,
+                              child: TextWidget(
+                                text: period,
+                                fontSize: 14,
+                                fontFamily: 'Regular',
+                                color: AppTheme.primaryColor,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Chart Section
+                        Expanded(
+                          flex: 1,
+                          child: SizedBox(
+                            height: 300,
+                            child: FutureBuilder<List<Map<String, dynamic>>>(
+                              future: _getBestSellersForChart(
+                                  _selectedPeriod == 'Custom'
+                                      ? 'Daily'
+                                      : _selectedPeriod),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'Error: ${snapshot.error}',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: festiveRed,
+                                    ),
+                                  );
+                                }
+                                final data = snapshot.data ?? [];
+                                if (data.isEmpty) {
+                                  return Center(
+                                    child: TextWidget(
+                                      text: 'No sales data available',
+                                      fontSize: 14,
+                                      fontFamily: 'Regular',
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                }
+                                return BarChart(
+                                  BarChartData(
+                                    alignment: BarChartAlignment.spaceAround,
+                                    maxY: data.isNotEmpty
+                                        ? data
+                                                .map((item) =>
+                                                    item['quantity'] as int)
+                                                .reduce(
+                                                    (a, b) => a > b ? a : b) *
+                                            1.2
+                                        : 10,
+                                    barTouchData: BarTouchData(
+                                      touchTooltipData: BarTouchTooltipData(
+                                        getTooltipColor: (group) =>
+                                            Colors.blueGrey,
+                                        getTooltipItem:
+                                            (group, groupIndex, rod, rodIndex) {
+                                          final item = data[group.x.toInt()];
+                                          return BarTooltipItem(
+                                            '${item['name']}\nQty: ${item['quantity']}\nRevenue: P${item['total'].toStringAsFixed(2)}',
+                                            const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    titlesData: FlTitlesData(
+                                      show: true,
+                                      rightTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false)),
+                                      topTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false)),
+                                      bottomTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          reservedSize: 60,
+                                          getTitlesWidget: (value, meta) {
+                                            if (value.toInt() >= 0 &&
+                                                value.toInt() < data.length) {
+                                              final itemName =
+                                                  data[value.toInt()]['name']
+                                                      as String;
+                                              // Truncate long item names
+                                              final displayName = itemName
+                                                          .length >
+                                                      10
+                                                  ? '${itemName.substring(0, 10)}...'
+                                                  : itemName;
+                                              return SideTitleWidget(
+                                                axisSide: meta.axisSide,
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          top: 8.0),
+                                                  child: TextWidget(
+                                                    text: displayName,
+                                                    fontSize: 10,
+                                                    fontFamily: 'Regular',
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                            return const Text('');
+                                          },
+                                        ),
+                                      ),
+                                      leftTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          reservedSize: 40,
+                                          getTitlesWidget: (value, meta) {
+                                            return TextWidget(
+                                              text: value.toInt().toString(),
+                                              fontSize: 10,
+                                              fontFamily: 'Regular',
+                                              color: Colors.grey[600],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    borderData: FlBorderData(
+                                      show: true,
+                                      border: Border.all(
+                                          color: Colors.grey.withOpacity(0.3)),
+                                    ),
+                                    barGroups:
+                                        data.asMap().entries.map((entry) {
+                                      final index = entry.key;
+                                      final item = entry.value;
+                                      return BarChartGroupData(
+                                        x: index,
+                                        barRods: [
+                                          BarChartRodData(
+                                            toY: item['quantity'].toDouble(),
+                                            color: _getBarColor(index),
+                                            width: 22,
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                              topLeft: Radius.circular(4),
+                                              topRight: Radius.circular(4),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Data Table Section
+                        Expanded(
+                          flex: 1,
+                          child: FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _getBestSellersData(
+                                _selectedPeriod == 'Custom'
+                                    ? 'Daily'
+                                    : _selectedPeriod),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: TextWidget(
+                                    text: 'Error: ${snapshot.error}',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: festiveRed,
+                                  ),
+                                );
+                              }
+                              final data = snapshot.data ?? [];
+                              if (data.isEmpty) {
+                                return Center(
+                                  child: TextWidget(
+                                    text: 'No sales data available',
+                                    fontSize: 14,
+                                    fontFamily: 'Regular',
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              }
+                              return SingleChildScrollView(
+                                child: DataTable(
+                                  columnSpacing: 12,
+                                  dataRowHeight: 50,
+                                  headingRowColor: WidgetStatePropertyAll(
+                                      AppTheme.primaryColor.withOpacity(0.1)),
+                                  columns: [
+                                    DataColumn(
+                                      label: TextWidget(
+                                        text: 'Rank',
+                                        fontSize: 14,
+                                        fontFamily: 'Bold',
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: TextWidget(
+                                        text: 'Item Name',
+                                        fontSize: 14,
+                                        fontFamily: 'Bold',
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: TextWidget(
+                                        text: 'Qty',
+                                        fontSize: 14,
+                                        fontFamily: 'Bold',
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: TextWidget(
+                                        text: 'Revenue',
+                                        fontSize: 14,
+                                        fontFamily: 'Bold',
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                  rows: data.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final item = entry.value;
+                                    return DataRow(
+                                      color: WidgetStatePropertyAll(
+                                          index % 2 == 0
+                                              ? Colors.transparent
+                                              : Colors.grey.withOpacity(0.05)),
+                                      cells: [
+                                        DataCell(
+                                          Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: _getRankColor(index),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: TextWidget(
+                                              text: '#${index + 1}',
+                                              fontSize: 12,
+                                              fontFamily: 'Bold',
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          TextWidget(
+                                            text: item['name'],
+                                            fontSize: 12,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        DataCell(
+                                          TextWidget(
+                                            text: item['quantity'].toString(),
+                                            fontSize: 12,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        DataCell(
+                                          TextWidget(
+                                            text:
+                                                'P${item['total'].toStringAsFixed(2)}',
+                                            fontSize: 12,
+                                            fontFamily: 'Regular',
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1445,6 +1865,34 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         ),
       ),
     );
+  }
+
+  // Helper method to get bar colors for the chart
+  Color _getBarColor(int index) {
+    switch (index) {
+      case 0:
+        return Colors.amber; // Gold for 1st place
+      case 1:
+        return Colors.grey; // Silver for 2nd place
+      case 2:
+        return Colors.brown; // Bronze for 3rd place
+      default:
+        return AppTheme.primaryColor; // Primary color for others
+    }
+  }
+
+  // Helper method to get rank colors for the data table
+  Color _getRankColor(int index) {
+    switch (index) {
+      case 0:
+        return Colors.amber; // Gold for 1st place
+      case 1:
+        return Colors.grey; // Silver for 2nd place
+      case 2:
+        return Colors.brown; // Bronze for 3rd place
+      default:
+        return AppTheme.primaryColor; // Primary color for others
+    }
   }
 
   Widget _buildBreakdownCard({

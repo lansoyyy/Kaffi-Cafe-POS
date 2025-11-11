@@ -1340,74 +1340,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Current date display with modern design
-            Container(
-              padding: const EdgeInsets.all(24.0),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppTheme.primaryColor.withOpacity(0.9),
-                    AppTheme.primaryColor.withOpacity(0.7),
-                    AppTheme.primaryColor.withOpacity(0.5),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: plainWhite.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      Icons.today,
-                      color: plainWhite,
-                      size: fontSize * 2,
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextWidget(
-                          text: 'Today',
-                          fontSize: fontSize + 1,
-                          color: plainWhite.withOpacity(0.9),
-                          fontFamily: 'Regular',
-                        ),
-                        TextWidget(
-                          text: DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                          fontSize: fontSize + 4,
-                          color: plainWhite,
-                          isBold: true,
-                          fontFamily: 'Bold',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
             // Total tables summary with modern design
             Container(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(15.0),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 color: plainWhite,
@@ -1422,7 +1361,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -1451,6 +1390,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         ),
                         TextWidget(
                           text: '${_tables.length} Total Tables',
+                          fontSize: fontSize + 4,
+                          color: textBlack,
+                          isBold: true,
+                          fontFamily: 'Bold',
+                        ),
+                        TextWidget(
+                          text: DateFormat('dd/MM/yyyy').format(DateTime.now()),
                           fontSize: fontSize + 4,
                           color: textBlack,
                           isBold: true,
@@ -1803,7 +1749,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1811,7 +1757,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
             Hero(
               tag: 'monitoring_header',
               child: Container(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(15.0),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: LinearGradient(
@@ -1849,28 +1795,53 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           ),
                         ),
                         const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextWidget(
+                              text: 'Active Reservations',
+                              fontSize: fontSize + 6,
+                              color: plainWhite,
+                              isBold: true,
+                              fontFamily: 'Bold',
+                            ),
+                            const SizedBox(height: 4),
+                            TextWidget(
+                              text:
+                                  '${_activeReservations.length} reservation(s) today',
+                              fontSize: fontSize + 1,
+                              color: plainWhite.withOpacity(0.9),
+                              fontFamily: 'Regular',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 50),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: plainWhite.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
                             children: [
-                              TextWidget(
-                                text: 'Active Reservations',
-                                fontSize: fontSize + 6,
+                              Icon(
+                                Icons.today,
                                 color: plainWhite,
-                                isBold: true,
-                                fontFamily: 'Bold',
+                                size: fontSize * 1.5,
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(width: 12),
                               TextWidget(
                                 text:
-                                    '${_activeReservations.length} reservation(s) today',
+                                    'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
                                 fontSize: fontSize + 1,
-                                color: plainWhite.withOpacity(0.9),
-                                fontFamily: 'Regular',
+                                color: plainWhite,
+                                fontFamily: 'Medium',
                               ),
                             ],
                           ),
                         ),
+                        Spacer(),
                         Container(
                           decoration: BoxDecoration(
                             color: plainWhite.withOpacity(0.2),
@@ -1884,31 +1855,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: plainWhite.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.today,
-                            color: plainWhite,
-                            size: fontSize * 1.5,
-                          ),
-                          const SizedBox(width: 12),
-                          TextWidget(
-                            text:
-                                'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
-                            fontSize: fontSize + 1,
-                            color: plainWhite,
-                            fontFamily: 'Medium',
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -1924,9 +1870,16 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       'All reservations will appear here when they become active',
                       fontSize,
                     )
-                  : ListView.builder(
+                  : GridView.builder(
                       padding: EdgeInsets.zero,
                       itemCount: _activeReservations.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.5,
+                      ),
                       itemBuilder: (context, index) {
                         final reservation = _activeReservations[index];
                         final countdown =
@@ -2396,13 +2349,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Filters with modern design
             Container(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(12.0),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 color: plainWhite,
@@ -2444,6 +2397,110 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         isBold: true,
                         fontFamily: 'Bold',
                       ),
+                      const SizedBox(width: 50),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: ashGray.withOpacity(0.2)),
+                        ),
+                        child: SizedBox(
+                          width: 500,
+                          child: DropdownButtonFormField<String>(
+                            value: _historyFilter,
+                            decoration: InputDecoration(
+                              labelText: 'Status',
+                              labelStyle: TextStyle(
+                                color: charcoalGray,
+                                fontSize: fontSize,
+                                fontFamily: 'Regular',
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 16),
+                            ),
+                            icon: Icon(Icons.arrow_drop_down,
+                                color: AppTheme.primaryColor),
+                            style: TextStyle(
+                              color: textBlack,
+                              fontSize: fontSize + 1,
+                              fontFamily: 'Medium',
+                            ),
+                            items: [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.list,
+                                        color: AppTheme.primaryColor,
+                                        size: fontSize),
+                                    const SizedBox(width: 12),
+                                    TextWidget(
+                                      text: 'All Reservations',
+                                      fontSize: fontSize,
+                                      color: textBlack,
+                                      fontFamily: 'Regular',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'completed',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        color: palmGreen, size: fontSize),
+                                    const SizedBox(width: 12),
+                                    TextWidget(
+                                      text: 'Completed',
+                                      fontSize: fontSize,
+                                      color: textBlack,
+                                      fontFamily: 'Regular',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'cancelled',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.cancel,
+                                        color: festiveRed, size: fontSize),
+                                    const SizedBox(width: 12),
+                                    TextWidget(
+                                      text: 'Cancelled',
+                                      fontSize: fontSize,
+                                      color: textBlack,
+                                      fontFamily: 'Regular',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'expired',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.access_time,
+                                        color: Colors.orange, size: fontSize),
+                                    const SizedBox(width: 12),
+                                    TextWidget(
+                                      text: 'Expired',
+                                      fontSize: fontSize,
+                                      color: textBlack,
+                                      fontFamily: 'Regular',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _historyFilter = value!;
+                              });
+                              _loadReservationHistory();
+                            },
+                          ),
+                        ),
+                      ),
                       const Spacer(),
                       Container(
                         decoration: BoxDecoration(
@@ -2457,106 +2514,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: ashGray.withOpacity(0.2)),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      value: _historyFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Status',
-                        labelStyle: TextStyle(
-                          color: charcoalGray,
-                          fontSize: fontSize,
-                          fontFamily: 'Regular',
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
-                      ),
-                      icon: Icon(Icons.arrow_drop_down,
-                          color: AppTheme.primaryColor),
-                      style: TextStyle(
-                        color: textBlack,
-                        fontSize: fontSize + 1,
-                        fontFamily: 'Medium',
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'all',
-                          child: Row(
-                            children: [
-                              Icon(Icons.list,
-                                  color: AppTheme.primaryColor, size: fontSize),
-                              const SizedBox(width: 12),
-                              TextWidget(
-                                text: 'All Reservations',
-                                fontSize: fontSize,
-                                color: textBlack,
-                                fontFamily: 'Regular',
-                              ),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'completed',
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle,
-                                  color: palmGreen, size: fontSize),
-                              const SizedBox(width: 12),
-                              TextWidget(
-                                text: 'Completed',
-                                fontSize: fontSize,
-                                color: textBlack,
-                                fontFamily: 'Regular',
-                              ),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'cancelled',
-                          child: Row(
-                            children: [
-                              Icon(Icons.cancel,
-                                  color: festiveRed, size: fontSize),
-                              const SizedBox(width: 12),
-                              TextWidget(
-                                text: 'Cancelled',
-                                fontSize: fontSize,
-                                color: textBlack,
-                                fontFamily: 'Regular',
-                              ),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'expired',
-                          child: Row(
-                            children: [
-                              Icon(Icons.access_time,
-                                  color: Colors.orange, size: fontSize),
-                              const SizedBox(width: 12),
-                              TextWidget(
-                                text: 'Expired',
-                                fontSize: fontSize,
-                                color: textBlack,
-                                fontFamily: 'Regular',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _historyFilter = value!;
-                        });
-                        _loadReservationHistory();
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -2572,7 +2529,13 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       'Past reservations will appear here once they are completed or cancelled',
                       fontSize,
                     )
-                  : ListView.builder(
+                  : GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 2.2,
+                      ),
                       padding: EdgeInsets.zero,
                       itemCount: _reservationHistory.length,
                       itemBuilder: (context, index) {
@@ -2630,6 +2593,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                               child: Padding(
                                 padding: const EdgeInsets.all(20.0),
                                 child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Status icon with gradient
                                     Container(
