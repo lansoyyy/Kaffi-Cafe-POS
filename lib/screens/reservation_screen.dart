@@ -106,6 +106,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
     _reservationsListener?.cancel();
     _reservationsListener = _firestore
         .collection('reservations')
+        .where('branch', isEqualTo: _currentBranch)
         .where('date', isEqualTo: today)
         .where('status', whereIn: ['pending', 'confirmed', 'checked_in'])
         .snapshots()
@@ -155,6 +156,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       // Get all active reservations for today
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('date', isEqualTo: today)
           .where('status', whereIn: ['confirmed', 'checked_in']).get();
 
@@ -413,6 +415,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('date', isEqualTo: today)
           .where('status',
               whereIn: ['pending', 'confirmed', 'checked_in']).get();
@@ -499,6 +502,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       // Check both 'time' and 'timeSlot' fields for compatibility
       final QuerySnapshot snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('tableId', isEqualTo: tableId)
           .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(date))
           .where('status',
@@ -552,6 +556,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
       final snapshot = await _firestore
           .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch)
           .where('date', isEqualTo: today)
           .where('status', whereIn: ['confirmed', 'checked_in']).get();
 
@@ -748,7 +753,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
   // Load reservation history
   Future<void> _loadReservationHistory() async {
     try {
-      Query query = _firestore.collection('reservations');
+      Query query = _firestore
+          .collection('reservations')
+          .where('branch', isEqualTo: _currentBranch);
 
       // Apply date filters
       if (_historyStartDate != null) {

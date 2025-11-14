@@ -40,7 +40,6 @@ class _OrderScreenState extends State<OrderScreen>
         _searchQuery = _searchController.text;
       });
     });
-    _fetchReservations();
   }
 
   Future<void> _getCurrentBranch() async {
@@ -49,39 +48,6 @@ class _OrderScreenState extends State<OrderScreen>
       setState(() {
         _currentBranch = currentBranch;
       });
-    }
-  }
-
-  // Fetch reservations from Firestore
-  Future<void> _fetchReservations() async {
-    if (mounted) {
-      setState(() {
-        _isLoadingReservations = true;
-      });
-    }
-
-    try {
-      final today = DateFormat('dd/MM/yyyy').format(DateTime.now());
-      final QuerySnapshot snapshot = await _firestore
-          .collection('reservations')
-          .where('date', isEqualTo: today)
-          .where('status', whereIn: ['confirmed', 'checked_in'])
-          .orderBy('time')
-          .get();
-
-      if (mounted) {
-        setState(() {
-          _reservations = snapshot.docs;
-          _isLoadingReservations = false;
-        });
-      }
-    } catch (e) {
-      print('Error fetching reservations: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingReservations = false;
-        });
-      }
     }
   }
 
