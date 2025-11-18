@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:kaffi_cafe_pos/utils/colors.dart';
@@ -260,6 +261,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       await _firestore.collection('tables').doc(tableId).set({
         'enabled': newStatus,
         'disableReason': newStatus ? '' : reason,
+        'branch': _currentBranch,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -445,13 +447,22 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   // Tables configuration (3 tables with 2 seats, 2 tables with 4 seats)
-  final List<Map<String, dynamic>> _tables = [
-    {'id': 'table1', 'name': 'Table 1', 'capacity': 2},
-    {'id': 'table2', 'name': 'Table 2', 'capacity': 2},
-    {'id': 'table3', 'name': 'Table 3', 'capacity': 2},
-    {'id': 'table4', 'name': 'Table 4', 'capacity': 4},
-    {'id': 'table5', 'name': 'Table 5', 'capacity': 4},
-  ];
+  final List<Map<String, dynamic>> _tables =
+      BranchService.getSelectedBranch() == 'Kaffi Cafe - Eloisa St'
+          ? [
+              {'id': 'table1', 'name': 'Table 1', 'capacity': 2},
+              {'id': 'table2', 'name': 'Table 2', 'capacity': 2},
+              {'id': 'table3', 'name': 'Table 3', 'capacity': 2},
+              {'id': 'table4', 'name': 'Table 4', 'capacity': 4},
+              {'id': 'table5', 'name': 'Table 5', 'capacity': 4},
+            ]
+          : [
+              {'id': 'table11', 'name': 'Table 1', 'capacity': 2},
+              {'id': 'table22', 'name': 'Table 2', 'capacity': 2},
+              {'id': 'table33', 'name': 'Table 3', 'capacity': 2},
+              {'id': 'table44', 'name': 'Table 4', 'capacity': 4},
+              {'id': 'table55', 'name': 'Table 5', 'capacity': 4},
+            ];
 
   // Generate available time slots based on operating hours (10:00 AM - 2:00 AM)
   // Format: 10:00 AM - 10:55 AM (55 mins reservation, 5 mins cleaning)
